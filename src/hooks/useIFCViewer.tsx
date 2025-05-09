@@ -1,3 +1,4 @@
+
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -97,14 +98,13 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         
         modelRef.current = model;
         
-        // Mejor método de encuadre: Calcular bounding box del modelo
         if (model && model.mesh) {
           // 1) Calcular la caja envolvente del mesh
           const bbox = new THREE.Box3().setFromObject(model.mesh);
           
           // 2) Extraer el centro y la esfera envolvente
           const center = bbox.getCenter(new THREE.Vector3());
-          const sphere = bbox.getBoundingSphere(new THREE.Sphere());
+          const sphere = bbox.getBoundingSphere(new THREE.Sphere()); // Passing a new Sphere as argument
           
           // 3) Encuadrar la cámara al centro y ajustarla para que quepa todo
           viewer.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);
@@ -162,7 +162,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           // Si tenemos un modelo cargado, calculamos su bounding box
           const bbox = new THREE.Box3().setFromObject(modelRef.current.mesh);
           const center = bbox.getCenter(new THREE.Vector3());
-          const sphere = bbox.getBoundingSphere(new THREE.Sphere());
+          const sphere = bbox.getBoundingSphere(new THREE.Sphere()); // Passing a new Sphere as argument
           
           // Encuadramos usando la esfera calculada
           viewerRef.current.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);

@@ -1,5 +1,6 @@
 
 import React, { useRef, useState } from "react";
+import * as THREE from "three";  // Added THREE import
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
