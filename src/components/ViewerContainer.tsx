@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useThree } from '@react-three/fiber';
-import { OrbitControls, Stats, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { useThree } from '@react-three/fiber';
+import { OrbitControls, Stats } from '@react-three/drei';
 import { Scan } from 'lucide-react';
 
 interface ViewerContainerProps {

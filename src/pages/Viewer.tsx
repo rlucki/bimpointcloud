@@ -23,7 +23,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import PointCloudViewer from "@/components/PointCloudViewer";
 import ViewerContainer, { HtmlOverlay } from "@/components/ViewerContainer";
-import { handleFrameAll, debugViewer } from "@/components/viewer/ViewerUtils";
+import { handleFrameAll as utilsHandleFrameAll, debugViewer } from "@/components/viewer/ViewerUtils";
 import ViewerSidebar from "@/components/viewer/ViewerSidebar";
 import ViewerControls from "@/components/viewer/ViewerControls";
 
@@ -328,7 +328,7 @@ const Viewer = () => {
   const frameAll = () => {
     // If using IFC Viewer
     if (viewerRef.current) {
-      handleFrameAll(viewerRef);
+      utilsHandleFrameAll(viewerRef);
     }
   };
 

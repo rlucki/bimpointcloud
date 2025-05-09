@@ -1,8 +1,6 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
-import { Points, PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
+import { Points } from '@react-three/drei';
 
 interface PointCloudProps {
   url?: string;
