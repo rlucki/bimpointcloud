@@ -1,4 +1,3 @@
-
 import { useRef, useState, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";

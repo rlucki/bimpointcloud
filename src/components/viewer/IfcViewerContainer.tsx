@@ -51,16 +51,18 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
         )}
       </div>
       
-      {/* Diagnostics shortcut button */}
-      {((!modelLoaded && onOpenDiagnostics && viewerInitialized) || (modelLoaded && meshExists === false)) && (
+      {/* Diagnostics button - Now more prominent when needed */}
+      {((!modelLoaded && onOpenDiagnostics && viewerInitialized) || 
+        (modelLoaded && meshExists === false) || 
+        (modelLoaded && onOpenDiagnostics)) && (
         <div className="absolute top-4 right-4">
           <Button 
             onClick={onOpenDiagnostics}
-            className="bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1"
+            className={`${meshExists === false ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'} text-white flex items-center gap-1 shadow-md`}
             size="sm"
           >
             <Bug className="h-4 w-4" />
-            <span>Diagnose Model</span>
+            <span>{meshExists === false ? 'Fix Mesh Issues' : 'Diagnose Model'}</span>
           </Button>
         </div>
       )}
