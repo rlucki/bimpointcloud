@@ -375,6 +375,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         } else {
           // FIX: Pass the scene as the required first argument
           const scene = viewerRef.current.context.getScene();
+          // Make sure to provide the scene object as the first argument
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         }
         console.log("Framed objects");
