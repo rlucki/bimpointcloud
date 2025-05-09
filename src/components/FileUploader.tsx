@@ -90,24 +90,12 @@ const FileUploader: React.FC = () => {
           if (currentStep >= steps) {
             clearInterval(updateProgress);
             
-            // 10% chance of upload error for demonstration
-            const isError = Math.random() < 0.1;
-            
+            // For demo purposes, let's make all uploads successful
             setFiles((prevFiles) =>
               prevFiles.map((f) =>
-                f.id === file.id
-                  ? { ...f, status: isError ? "error" : "success", progress: isError ? 80 : 100 }
-                  : f
+                f.id === file.id ? { ...f, status: "success", progress: 100 } : f
               )
             );
-
-            if (isError) {
-              toast({
-                variant: "destructive",
-                title: "Upload failed",
-                description: `Failed to upload ${file.name}. Please try again.`,
-              });
-            }
             
             resolve();
           }
@@ -125,6 +113,18 @@ const FileUploader: React.FC = () => {
         title: "Upload complete",
         description: `Successfully uploaded ${successCount} of ${files.length} files.`,
       });
+
+      // Automatically navigate to viewer after successful upload
+      const successFile = files.find((file) => file.status === "success");
+      if (successFile) {
+        const fileExtension = successFile.name.split('.').pop()?.toLowerCase();
+        const fileType = fileExtension === 'ifc' ? 'ifc' : 'las';
+        
+        // Log for debugging
+        console.log("Auto-navigating to viewer with:", { fileType, fileName: successFile.name });
+        
+        navigate('/viewer', { state: { fileType, fileName: successFile.name } });
+      }
     }
     
     setIsUploading(false);

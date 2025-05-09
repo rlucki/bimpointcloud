@@ -1,42 +1,90 @@
 
-import React, { useState } from "react";
-import { useLocation, Navigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useLocation, Navigate, useNavigate } from "react-router-dom";
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from "@/components/ui/menubar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 import { 
   Menu, 
-  Search, 
+  File,
+  X,
   Settings, 
   ChevronLeft, 
   ChevronRight,
-  Info,
+  Eye,
   MinimizeIcon,
   MaximizeIcon
 } from "lucide-react";
 
 const Viewer = () => {
   const location = useLocation();
-  const { fileType, fileName } = location.state || { fileType: null, fileName: null };
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Si no hay state, redirigir a la página principal
-  if (!location.state) {
-    return <Navigate to="/" />;
-  }
+  // Extract state from location or provide defaults
+  const state = location.state || {};
+  const fileType = state.fileType;
+  const fileName = state.fileName;
+
+  // If no state, redirect to the main page
+  useEffect(() => {
+    if (!fileType || !fileName) {
+      toast({
+        variant: "destructive",
+        title: "No file selected",
+        description: "Please upload a file first to view it in 3D",
+      });
+      navigate('/');
+    } else {
+      console.log("Viewer received:", { fileType, fileName });
+      
+      // Simulate loading
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [fileType, fileName, navigate, toast]);
   
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch(err => {
+        console.error("Could not enter fullscreen mode:", err);
+      });
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setIsFullscreen(false);
+        document.exitFullscreen().then(() => {
+          setIsFullscreen(false);
+        }).catch(err => {
+          console.error("Could not exit fullscreen mode:", err);
+        });
       }
     }
   };
+
+  const goBack = () => {
+    navigate('/');
+  };
+  
+  // If loading, show loader
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#222222] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4 mx-auto"></div>
+          <p className="text-white text-lg">Loading viewer...</p>
+          <p className="text-gray-400 text-sm mt-2">Preparing {fileName}</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex flex-col bg-[#222222]">
@@ -56,8 +104,8 @@ const Viewer = () => {
               <div className="p-4">
                 <h3 className="text-sm font-medium mb-2">MODELS</h3>
                 <ul>
-                  <li className="py-1 px-2 rounded hover:bg-[#444444] cursor-pointer text-sm">
-                    {fileName || "No model loaded"}
+                  <li className="py-1 px-2 rounded hover:bg-[#444444] cursor-pointer text-sm flex items-center">
+                    <File className="h-4 w-4 mr-2" /> {fileName || "No model loaded"}
                   </li>
                 </ul>
               </div>
@@ -106,8 +154,11 @@ const Viewer = () => {
           </Menubar>
           
           <div className="flex items-center ml-2">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-[#444444]" onClick={goBack}>
+              <X className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" className="text-white hover:bg-[#444444]">
-              <Search className="h-4 w-4" />
+              <Eye className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="text-white hover:bg-[#444444]">
               <Settings className="h-4 w-4" />
@@ -151,7 +202,8 @@ const Viewer = () => {
                 </div>
               ) : (
                 <div className="text-[#CCCCCC] text-sm p-2">
-                  No structure available for LAS files
+                  <p>LAS Point Cloud</p>
+                  <p className="text-xs text-gray-400 mt-2">File: {fileName}</p>
                 </div>
               )}
             </div>
@@ -181,12 +233,15 @@ const Viewer = () => {
             title="TheOpenEngine Viewer"
           ></iframe>
           
-          {/* Info Overlay */}
+          {/* File info overlay */}
           <div className="absolute bottom-4 right-4">
-            <Button variant="outline" size="sm" className="bg-[#333333] text-white border-[#444444] hover:bg-[#444444] flex items-center gap-2">
-              <Info className="h-4 w-4" /> 
-              <span>{fileName || "No file"}</span>
-            </Button>
+            <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
+              <div className="flex items-center gap-2">
+                <File className="h-4 w-4" /> 
+                <span>{fileName}</span>
+                <span className="text-xs bg-[#444444] px-2 py-1 rounded">{fileType?.toUpperCase()}</span>
+              </div>
+            </div>
           </div>
         </main>
       </div>
