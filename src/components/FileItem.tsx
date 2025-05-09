@@ -17,7 +17,8 @@ const FileItem: React.FC<FileItemProps> = ({
   status,
   onRemove,
 }) => {
-  const fileExtension = file.name.split(".").pop()?.toLowerCase();
+  // Add a safety check to ensure file and file.name exist before using split
+  const fileExtension = file && file.name ? file.name.split(".").pop()?.toLowerCase() : '';
   
   const getFileIcon = () => {
     switch (fileExtension) {
@@ -53,10 +54,10 @@ const FileItem: React.FC<FileItemProps> = ({
       </div>
       <div className="flex-grow mr-3">
         <div className="flex justify-between items-center mb-1">
-          <h4 className="text-sm font-medium truncate max-w-[200px] sm:max-w-[300px]" title={file.name}>
-            {file.name}
+          <h4 className="text-sm font-medium truncate max-w-[200px] sm:max-w-[300px]" title={file?.name || "Unknown file"}>
+            {file?.name || "Unknown file"}
           </h4>
-          <span className="text-xs text-muted-foreground">{Math.round(file.size / 1024)} KB</span>
+          <span className="text-xs text-muted-foreground">{file?.size ? Math.round(file.size / 1024) : 0} KB</span>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
