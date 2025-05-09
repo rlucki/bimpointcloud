@@ -12,7 +12,7 @@ import ViewerError from "./viewer/ViewerError";
 import ViewerLoading from "./viewer/ViewerLoading";
 import ViewerCanvas from "./viewer/ViewerCanvas";
 import { useIFCViewer } from "@/hooks/useIFCViewer";
-import IfcViewerContainer from "./viewer/IfcViewerContainer";
+import IfcViewerContainer from "@/components/viewer/IfcViewerContainer";
 
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;

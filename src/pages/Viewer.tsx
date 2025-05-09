@@ -8,7 +8,7 @@ import { debugViewer } from "@/components/viewer/ViewerUtils";
 import ViewerControls from "@/components/viewer/ViewerControls";
 import ViewerLayout from "@/components/viewer/ViewerLayout";
 import { useIFCViewer } from "@/hooks/useIFCViewer";
-import IFCViewerContainer from "@/components/viewer/IFCViewerContainer";
+import IfcViewerContainer from "@/components/viewer/IfcViewerContainer";
 import LASViewerContainer from "@/components/viewer/LASViewerContainer";
 import ViewerLoadingScreen from "@/components/viewer/ViewerLoadingScreen";
 import { AxesInfoOverlay, FileInfoOverlay } from "@/components/viewer/ViewerInfoOverlay";
