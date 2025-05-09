@@ -365,7 +365,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
-  // Modified handleFrameAll function to accept an optional parameter
+  // Modified handleFrameAll function to properly handle the fitToSphere call
   const handleFrameAll = (target?: THREE.Object3D) => {
     if (viewerRef.current) {
       try {
@@ -373,9 +373,9 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           // If a specific target is provided, frame that object
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(target, true);
         } else {
-          // FIX: Pass the scene as the required first argument
+          // Get the scene to pass as the required first argument
           const scene = viewerRef.current.context.getScene();
-          // Make sure to provide the scene object as the first argument
+          // Always pass the scene as the first argument to fitToSphere
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         }
         console.log("Framed objects");
