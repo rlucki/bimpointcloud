@@ -14,8 +14,7 @@ const FileUploaderContent: React.FC = () => {
     handleRemoveFile,
     simulateUpload,
     clearCompleted,
-    viewIn3D,
-    hasSuccessfulFiles
+    viewIn3D
   } = useFileUpload();
 
   return (
@@ -43,7 +42,6 @@ const FileUploaderContent: React.FC = () => {
         <FileActions 
           isUploading={isUploading}
           filesExist={files.length > 0}
-          hasSuccessfulFiles={hasSuccessfulFiles}
           onUpload={simulateUpload}
           onViewIn3D={viewIn3D}
         />

@@ -3,7 +3,6 @@ import React from "react";
 import FileUploader from "@/components/FileUploader";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Eye } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -27,16 +26,6 @@ const Index = () => {
               Drag and drop your IFC building models or LAS point cloud files to
               visualize and analyze them in 3D space.
             </p>
-            
-            <div className="mt-6">
-              <Button 
-                onClick={() => navigate('/viewer')} 
-                className="flex items-center gap-2"
-              >
-                <Eye className="h-4 w-4" />
-                Go to 3D Viewer
-              </Button>
-            </div>
           </div>
           
           <FileUploader />

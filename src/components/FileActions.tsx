@@ -6,7 +6,6 @@ import { Box } from "lucide-react";
 interface FileActionsProps {
   isUploading: boolean;
   filesExist: boolean;
-  hasSuccessfulFiles: boolean;
   onUpload: () => void;
   onViewIn3D: () => void;
 }
@@ -14,7 +13,6 @@ interface FileActionsProps {
 const FileActions: React.FC<FileActionsProps> = ({
   isUploading,
   filesExist,
-  hasSuccessfulFiles,
   onUpload,
   onViewIn3D,
 }) => {
@@ -27,15 +25,13 @@ const FileActions: React.FC<FileActionsProps> = ({
         {isUploading ? "Uploading..." : "Upload Files"}
       </Button>
       
-      {hasSuccessfulFiles && (
-        <Button 
-          onClick={onViewIn3D} 
-          variant="outline"
-          className="flex items-center gap-1"
-        >
-          <Box className="h-4 w-4" /> View in 3D
-        </Button>
-      )}
+      <Button 
+        onClick={onViewIn3D} 
+        variant="outline"
+        className="flex items-center gap-1"
+      >
+        <Box className="h-4 w-4" /> View in 3D
+      </Button>
     </div>
   );
 };
