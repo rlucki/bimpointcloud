@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft, Box, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as THREE from "three";
-import { IFCViewer } from "web-ifc-viewer";
+import { IfcViewerAPI } from "web-ifc-viewer";
 
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;
@@ -40,7 +40,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
 
     if (fileType === 'ifc') {
       // Initialize IFC viewer when component mounts
-      let viewer: IFCViewer | null = null;
+      let viewer: IfcViewerAPI | null = null;
       
       const initIFCViewer = async () => {
         try {
@@ -49,7 +49,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
           console.log("Initializing IFC viewer...");
           
           // Create the viewer
-          viewer = new IFCViewer({
+          viewer = new IfcViewerAPI({
             container: containerRef.current,
             backgroundColor: new THREE.Color(0xf0f4ff)
           });
