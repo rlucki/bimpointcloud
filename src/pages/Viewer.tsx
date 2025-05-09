@@ -114,10 +114,10 @@ const Viewer = () => {
             // Fit the model in the view
             const ifcProject = await viewer.IFC.getSpatialStructure(model.modelID);
             
-            // Center view on the model - Fix: using correct parameter types
+            // Center view on the model - Fix: providing both required parameters
             setTimeout(() => {
-              // Fix: Using undefined instead of boolean/number to use default values
-              viewer.context.ifcCamera.cameraControls.fitToSphere(undefined);
+              // Fixed: Providing both mesh and immediate parameters
+              viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
               toast({
                 title: "IFC Model Loaded",
                 description: `${fileName} loaded successfully`
@@ -396,8 +396,9 @@ const Viewer = () => {
     if (fileType === 'ifc' && viewerRef.current) {
       // Reset IFC view to show the whole model
       try {
-        // Fix: Using undefined instead of boolean/number to use default values
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(undefined);
+        // Fix: Properly calling fitToSphere with both required parameters
+        const scene = viewerRef.current.context.getScene();
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         toast({
           title: "View Reset",
           description: "IFC model centered in view"
