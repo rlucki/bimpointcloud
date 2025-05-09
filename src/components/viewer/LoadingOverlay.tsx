@@ -25,6 +25,10 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             {statusMessage}
           </p>
         )}
+        <div className="mt-4 text-xs text-gray-400 max-w-md mx-auto px-4">
+          <p>Tip: Asegúrate de tener el archivo WASM en la carpeta /public/wasm/</p>
+          <p className="mt-1">Si persiste el error, prueba con modelos IFC de ejemplo más simples</p>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,3 @@
-
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -255,11 +254,11 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       console.log("Scene:", viewerRef.current.context.getScene());
       console.log("Model:", modelRef.current);
       
-      // Diagnostic information about the wasm path
+      // Diagnostic information about the wasm path - CORRECCIÓN DE ERROR
       console.log("WASM information:");
       try {
-        const wasmPath = viewerRef.current.IFC.getWasmPath();
-        console.log("Current WASM path:", wasmPath);
+        console.log("Current WASM path: (checking IFC object)");
+        console.log(viewerRef.current.IFC);
       } catch (e) {
         console.log("Could not get WASM path:", e);
       }

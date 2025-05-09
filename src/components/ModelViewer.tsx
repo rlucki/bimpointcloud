@@ -7,10 +7,10 @@ import ViewerHeader from "./viewer/ViewerHeader";
 import ViewerStatusBar from "./viewer/ViewerStatusBar";
 import ViewerPlaceholder from "./viewer/ViewerPlaceholder";
 import ViewerError from "./viewer/ViewerError";
-import ViewerLoading from "./viewer/ViewerLoading";
 import { useIFCViewer } from "@/hooks/useIFCViewer";
 import IfcViewerContainer from "./viewer/IfcViewerContainer";
 import LoadingOverlay from "./viewer/LoadingOverlay";
+import ExampleModelSelector from "./viewer/ExampleModelSelector";
 
 interface ModelViewerProps {
   fileType: "ifc" | null;
@@ -25,6 +25,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
+  const [exampleUrl, setExampleUrl] = useState<string | undefined>(fileUrl);
 
   // Use our custom hook for IFC viewer
   const {
@@ -39,7 +40,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     debug
   } = useIFCViewer({
     containerRef,
-    fileUrl: fileType === 'ifc' ? fileUrl : undefined,
+    fileUrl: fileType === 'ifc' ? exampleUrl : undefined,
     fileName
   });
 
@@ -82,15 +83,14 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
       
       // Create a URL for the file
       const fileURL = URL.createObjectURL(file);
+      setExampleUrl(fileURL);
       
-      // Now navigate with both the file name and URL
-      navigate('/viewer', { 
-        state: { 
-          fileType: 'ifc' as const, 
-          fileName: file.name,
-          fileUrl: fileURL // Pass the object URL
-        }
-      });
+      // Update navigation state without reloading the page
+      window.history.pushState(
+        { fileType: 'ifc' as const, fileName: file.name, fileUrl: fileURL },
+        '',
+        window.location.pathname
+      );
     } else {
       toast({
         variant: "destructive",
@@ -118,6 +118,23 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
+  const handleLoadExampleModel = (url: string) => {
+    setExampleUrl(url);
+    const fileName = url.split('/').pop() || "example-model.ifc";
+    
+    // Update navigation state without reloading the page
+    window.history.pushState(
+      { fileType: 'ifc' as const, fileName, fileUrl: url },
+      '',
+      window.location.pathname
+    );
+    
+    toast({
+      title: "Loading example model",
+      description: `Loading ${fileName} from remote server...`,
+    });
+  };
+
   // Update status message based on viewer state
   React.useEffect(() => {
     if (isLoading) {
@@ -137,8 +154,8 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   if (isLoading) {
     return (
       <LoadingOverlay 
-        isDemoMode={!fileUrl} 
-        filesCount={fileUrl ? 1 : 0} 
+        isDemoMode={!fileUrl && !exampleUrl} 
+        filesCount={fileUrl || exampleUrl ? 1 : 0} 
         statusMessage={loadingStatus} 
       />
     );
@@ -154,6 +171,10 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         debug={debug}
       />
       
+      {!fileName && !error && (
+        <ExampleModelSelector onLoadExample={handleLoadExampleModel} />
+      )}
+      
       <Card 
         className={`relative overflow-hidden border shadow-md transition-all duration-300 flex-1 ${isDragging ? 'border-primary bg-primary/5' : 'bg-card'}`}
         onDragEnter={handleDragEnter}
@@ -168,7 +189,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             navigate={navigate} 
             onRetry={retry}
           />
-        ) : fileType === 'ifc' ? (
+        ) : fileType === 'ifc' || exampleUrl ? (
           <IfcViewerContainer 
             containerRef={containerRef}
             viewerInitialized={viewerInitialized}
@@ -178,15 +199,15 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           />
         ) : null}
 
-        {!fileType && !fileName && !error && (
+        {!fileType && !fileName && !exampleUrl && !error && (
           <ViewerPlaceholder openFileDialog={openFileDialog} />
         )}
       </Card>
       
       <ViewerStatusBar 
         status={statusMessage}
-        fileName={fileName}
-        fileType={fileType}
+        fileName={fileName || (exampleUrl ? exampleUrl.split('/').pop() : null)}
+        fileType={fileType || (exampleUrl ? 'ifc' : null)}
         isLoading={isLoading}
         info={"IFC Viewer"}
       />
