@@ -7,6 +7,7 @@ interface FileWithStatus extends File {
   id: string;
   progress: number;
   status: "idle" | "uploading" | "success" | "error";
+  url?: string; // Add URL for accessing the file data
 }
 
 interface FileUploadContextType {
@@ -56,6 +57,9 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     // Create file objects with additional properties
     const newFiles = validFiles.map((file) => {
+      // Generate object URL for the file to access it later
+      const url = URL.createObjectURL(file);
+      
       // Create a properly structured file object with explicit properties
       const fileWithStatus = {
         ...file,
@@ -70,6 +74,7 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         stream: file.stream,
         text: file.text,
         arrayBuffer: file.arrayBuffer,
+        url // Add URL to access the file data
       };
       
       // Debug log for the created file object
@@ -82,7 +87,14 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const handleRemoveFile = (id: string) => {
-    setFiles((prevFiles) => prevFiles.filter((file) => file.id !== id));
+    setFiles((prevFiles) => {
+      // Revoke object URLs before removing files to prevent memory leaks
+      const fileToRemove = prevFiles.find(file => file.id === id);
+      if (fileToRemove?.url) {
+        URL.revokeObjectURL(fileToRemove.url);
+      }
+      return prevFiles.filter((file) => file.id !== id);
+    });
   };
 
   const simulateUpload = async () => {
@@ -155,47 +167,40 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const clearCompleted = () => {
+    // Revoke object URLs for completed files
+    files.forEach(file => {
+      if (file.status === "success" && file.url) {
+        URL.revokeObjectURL(file.url);
+      }
+    });
+    
     setFiles((prevFiles) => prevFiles.filter((file) => file.status !== "success"));
   };
 
   const viewIn3D = () => {
-    // Find the first successful file
-    const successFile = files.find((file) => file.status === "success");
+    // Get all successful files
+    const successFiles = files.filter((file) => file.status === "success");
     
-    if (successFile && successFile.name) {
-      const fileExtension = successFile.name.split('.').pop()?.toLowerCase();
-      let fileType = null;
-      
-      if (fileExtension === 'ifc') {
-        fileType = 'ifc';
-      } else if (fileExtension === 'las') {
-        fileType = 'las';
-      }
+    if (successFiles.length > 0) {
+      // Prepare file data for the viewer
+      const fileData = successFiles.map(file => {
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+        return {
+          fileType: fileExtension === 'ifc' ? 'ifc' : 'las',
+          fileName: file.name,
+          fileSize: file.size,
+          fileUrl: file.url // Pass the object URL
+        };
+      });
       
       // Log information for debugging
-      console.log("Navigating to viewer with:", { fileType, fileName: successFile.name, fileSize: successFile.size });
+      console.log("Navigating to viewer with files:", fileData);
       
-      if (fileType) {
-        navigate('/viewer', { 
-          state: { 
-            fileType, 
-            fileName: successFile.name,
-            fileSize: successFile.size 
-          }
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Unsupported file format",
-          description: `The file ${successFile.name} has an unsupported format.`,
-        });
-      }
+      navigate('/viewer', { state: { files: fileData } });
     } else {
-      toast({
-        variant: "destructive",
-        title: "No uploaded files",
-        description: "Please upload at least one file successfully before viewing.",
-      });
+      // Demo mode: navigate to viewer without files
+      console.log("Navigating to viewer in demo mode");
+      navigate('/viewer', { state: { demo: true } });
     }
   };
 

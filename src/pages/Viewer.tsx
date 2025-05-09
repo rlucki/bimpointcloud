@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from "@/components/ui/menubar";
@@ -10,47 +11,47 @@ import {
   X,
   Settings, 
   ChevronLeft, 
-  ChevronRight,
-  Eye,
-  MinimizeIcon,
   MaximizeIcon,
-  Move,
-  ZoomIn,
-  Square,
-  Axis3d
+  MinimizeIcon,
+  Axis3d,
+  ZoomIn
 } from "lucide-react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import PointCloudViewer from "@/components/PointCloudViewer";
+import ViewerContainer from "@/components/ViewerContainer";
+
+// Type definitions for the file data
+interface FileData {
+  fileType: 'ifc' | 'las';
+  fileName: string;
+  fileSize: number;
+  fileUrl?: string;
+}
 
 const Viewer = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Set default to false to hide the sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewerInitialized, setViewerInitialized] = useState(false);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   
-  // References for the viewer elements
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const viewerRef = useRef<IfcViewerAPI | null>(null);
-  const isDraggingRef = useRef(false);
-  const lastPosRef = useRef({ x: 0, y: 0 });
-  const [zoomLevel, setZoomLevel] = useState(1.0);
-  const [viewPosition, setViewPosition] = useState({ x: 0, y: 0 });
-
-  // Extract state from location or provide defaults
+  // Extract files from location state
   const state = location.state || {};
-  const fileType = state.fileType;
-  const fileName = state.fileName;
-  const fileSize = state.fileSize;
-  const fileUrl = state.fileUrl; // Add support for fileUrl
-
-  // If no state, redirect to the main page
+  const files: FileData[] = state.files || [];
+  const isDemoMode = state.demo || files.length === 0;
+  
+  // References for the IFC viewer
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<IfcViewerAPI | null>(null);
+  
+  // If no files and not in demo mode, redirect to the main page
   useEffect(() => {
-    if (!fileType && !fileName) {
+    if (!isDemoMode && files.length === 0) {
       toast({
         variant: "destructive",
         title: "No file selected",
@@ -58,461 +59,80 @@ const Viewer = () => {
       });
       navigate('/');
     } else {
-      console.log("Viewer received:", { fileType, fileName, fileSize, fileUrl });
+      console.log("Viewer received:", { files, isDemoMode });
       
       // Simulate loading
       const timer = setTimeout(() => {
         setIsLoading(false);
-        // Initialize the appropriate viewer
-        initializeViewer();
-      }, 1500);
+        
+        // If there's an IFC file, initialize the IFC viewer
+        const ifcFile = files.find(file => file.fileType === 'ifc');
+        if (ifcFile && ifcFile.fileUrl) {
+          initializeIfcViewer(ifcFile);
+        }
+      }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [fileType, fileName, navigate, toast]);
+  }, [files, isDemoMode, navigate, toast]);
   
-  const initializeViewer = async () => {
-    if (fileType === 'ifc') {
-      try {
-        if (!containerRef.current) return;
-        
-        console.log("Initializing IFC viewer in full-screen mode...");
-        
-        // Create the viewer
-        const viewer = new IfcViewerAPI({
-          container: containerRef.current,
-          backgroundColor: new THREE.Color(0x222222)
-        });
-        
-        viewerRef.current = viewer;
-        
-        // Center the model at 0,0,0
-        viewer.context.getScene().position.set(0, 0, 0);
-        
-        // Set up camera - position farther back for better initial view
-        viewer.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
-        viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
-        
-        // Create a much more visible grid
-        const gridSize = 100;
-        const gridDivisions = 20;
-        const gridColor = 0x666666;
-        const gridColorCenterLines = 0xFFFFFF;
-        
-        // Create a larger and more visible grid
-        const grid = new THREE.GridHelper(gridSize, gridDivisions, gridColorCenterLines, gridColor);
-        grid.material.opacity = 0.8;
-        grid.material.transparent = true;
-        grid.position.set(0, 0, 0);
-        viewer.context.getScene().add(grid);
-        
-        // Add larger and more vibrant axes
-        const axesHelper = new THREE.AxesHelper(25);
-        axesHelper.position.set(0, 0.1, 0);
-        // Make axes lines thicker
-        const xAxis = axesHelper.geometry.attributes.position;
-        const colors = axesHelper.geometry.attributes.color;
-        
-        // Make x-axis red more vibrant
-        colors.setXYZ(0, 1.0, 0.2, 0.2); // Brighter red
-        colors.setXYZ(1, 1.0, 0.2, 0.2);
-        
-        // Make y-axis green more vibrant
-        colors.setXYZ(2, 0.2, 1.0, 0.2); // Brighter green
-        colors.setXYZ(3, 0.2, 1.0, 0.2);
-        
-        // Make z-axis blue more vibrant
-        colors.setXYZ(4, 0.2, 0.2, 1.0); // Brighter blue
-        colors.setXYZ(5, 0.2, 0.2, 1.0);
-        
-        colors.needsUpdate = true;
-        viewer.context.getScene().add(axesHelper);
-        
-        // Add a reference cube at the origin
-        const cubeGeometry = new THREE.BoxGeometry(5, 5, 5);
-        const cubeMaterial = new THREE.MeshBasicMaterial({ 
-          color: 0x4f46e5,
-          wireframe: true,
-          wireframeLinewidth: 2,
-          opacity: 0.8,
-          transparent: true
-        });
-        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        cube.position.set(0, 2.5, 0); // Place it at origin, slightly elevated
-        viewer.context.getScene().add(cube);
-        
-        // Add text marker for origin
-        const originMarker = document.createElement('div');
-        originMarker.className = 'absolute px-2 py-1 text-xs bg-white/20 text-white rounded pointer-events-none';
-        originMarker.textContent = 'Origin (0,0,0)';
-        containerRef.current.appendChild(originMarker);
-        
-        // Animate the reference cube to make it more noticeable
-        const animateReferenceCube = () => {
-          cube.rotation.y += 0.005;
-          cube.rotation.x += 0.002;
+  const initializeIfcViewer = async (fileData: FileData) => {
+    if (!containerRef.current) return;
+    
+    try {
+      console.log("Initializing IFC viewer for:", fileData.fileName);
+      
+      // Create the viewer
+      const viewer = new IfcViewerAPI({
+        container: containerRef.current,
+        backgroundColor: new THREE.Color(0x222222)
+      });
+      
+      viewerRef.current = viewer;
+      
+      // Set up camera
+      viewer.context.ifcCamera.cameraControls.setPosition(10, 10, 10);
+      viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+      
+      // Create a grid
+      const grid = new THREE.GridHelper(50, 50, 0xffffff, 0x888888);
+      grid.position.set(0, 0, 0);
+      viewer.context.getScene().add(grid);
+      
+      // Add axes
+      const axesHelper = new THREE.AxesHelper(10);
+      axesHelper.position.set(0, 0.1, 0);
+      viewer.context.getScene().add(axesHelper);
+      
+      // Load the IFC model if URL is available
+      if (fileData.fileUrl) {
+        try {
+          const model = await viewer.IFC.loadIfcUrl(fileData.fileUrl);
+          console.log("IFC model loaded:", model);
           
-          // Position the origin marker in 3D space
-          if (containerRef.current && originMarker) {
-            const vector = new THREE.Vector3(0, 0, 0);
-            vector.project(viewer.context.getCamera());
-            
-            const widthHalf = containerRef.current.clientWidth / 2;
-            const heightHalf = containerRef.current.clientHeight / 2;
-            
-            const x = (vector.x * widthHalf) + widthHalf;
-            const y = - (vector.y * heightHalf) + heightHalf;
-            
-            originMarker.style.left = `${x}px`;
-            originMarker.style.top = `${y + 20}px`;
-          }
-          
-          requestAnimationFrame(animateReferenceCube);
-        };
-        
-        animateReferenceCube();
-        
-        // Check if there's a file URL to load
-        if (fileUrl) {
-          try {
-            console.log("Loading IFC file from URL:", fileUrl);
-            
-            // Load the actual IFC model
-            const model = await viewer.IFC.loadIfcUrl(fileUrl);
-            
-            // Enable shadows for better visualization
-            viewer.shadowDropper.renderShadow(model.modelID);
-            
-            // Fit the model in the view
-            const ifcProject = await viewer.IFC.getSpatialStructure(model.modelID);
-            
-            // Center view on the model - providing both required parameters
-            setTimeout(() => {
-              // Start with a view of the origin to help user orient
-              viewer.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
-              viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
-              
-              // Then adjust to fit the model
-              viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
-              
-              toast({
-                variant: "default",
-                title: "Modelo IFC Cargado",
-                description: `${fileName} cargado exitosamente. Use el mouse para navegar.`
-              });
-            }, 500);
-          } catch (e) {
-            console.error("Error loading IFC model:", e);
-            toast({
-              variant: "destructive",
-              title: "Error al cargar el modelo",
-              description: "No se pudo cargar el modelo IFC. Mostrando modelo de ejemplo."
-            });
-            
-            // If loading fails, we already have the reference cube at the origin
-          }
-        } else {
-          // No file URL, the reference cube is already added
+          // Center view on the model
+          setTimeout(() => {
+            viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+          }, 500);
+        } catch (e) {
+          console.error("Error loading IFC model:", e);
           toast({
-            variant: "default",
-            title: "Modo Demo",
-            description: "Cubo de referencia centrado en el origen (0,0,0)"
+            variant: "destructive",
+            title: "Error loading model",
+            description: "The IFC model could not be loaded. Showing reference only."
           });
         }
-        
-        setViewerInitialized(true);
-        
-      } catch (e) {
-        console.error("Error initializing IFC viewer:", e);
-        toast({
-          variant: "destructive",
-          title: "Error de visualización",
-          description: "No se pudo inicializar el visualizador IFC.",
-        });
       }
-    } else if (fileType === 'las' && canvasRef.current) {
-      // For LAS files, render in canvas with origin reference
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        // Adjust canvas size to fit container
-        const resizeCanvas = () => {
-          if (containerRef.current && canvas) {
-            canvas.width = containerRef.current.clientWidth;
-            canvas.height = containerRef.current.clientHeight;
-            renderLasVisualization(ctx, canvas.width, canvas.height);
-          }
-        };
-        
-        // Setup canvas interactions
-        const handleMouseDown = (e: MouseEvent) => {
-          isDraggingRef.current = true;
-          lastPosRef.current = { x: e.clientX, y: e.clientY };
-        };
-        
-        const handleMouseMove = (e: MouseEvent) => {
-          if (isDraggingRef.current) {
-            const dx = e.clientX - lastPosRef.current.x;
-            const dy = e.clientY - lastPosRef.current.y;
-            
-            setViewPosition(prev => ({
-              x: prev.x + dx / zoomLevel,
-              y: prev.y + dy / zoomLevel
-            }));
-            
-            lastPosRef.current = { x: e.clientX, y: e.clientY };
-            
-            // Re-render with new position
-            renderLasVisualization(ctx, canvas.width, canvas.height);
-          }
-        };
-        
-        const handleMouseUp = () => {
-          isDraggingRef.current = false;
-        };
-        
-        const handleWheel = (e: WheelEvent) => {
-          e.preventDefault();
-          const delta = e.deltaY > 0 ? -0.1 : 0.1;
-          const newZoom = Math.max(0.5, Math.min(5.0, zoomLevel + delta));
-          setZoomLevel(newZoom);
-          
-          // Re-render with new zoom
-          renderLasVisualization(ctx, canvas.width, canvas.height);
-        };
-        
-        // Add event listeners
-        canvas.addEventListener('mousedown', handleMouseDown);
-        canvas.addEventListener('mousemove', handleMouseMove);
-        canvas.addEventListener('mouseup', handleMouseUp);
-        canvas.addEventListener('mouseleave', handleMouseUp);
-        canvas.addEventListener('wheel', handleWheel);
-        
-        // Call resize immediately and on window resize
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-        
-        setViewerInitialized(true);
-        
-        toast({
-          variant: "default",
-          title: "Visualizador LAS Listo",
-          description: "Visualización de nube de puntos centrada en el origen (0,0,0)"
-        });
-        
-        return () => {
-          window.removeEventListener('resize', resizeCanvas);
-          canvas.removeEventListener('mousedown', handleMouseDown);
-          canvas.removeEventListener('mousemove', handleMouseMove);
-          canvas.removeEventListener('mouseup', handleMouseUp);
-          canvas.removeEventListener('mouseleave', handleMouseUp);
-          canvas.removeEventListener('wheel', handleWheel);
-        };
-      }
+    } catch (e) {
+      console.error("Error initializing IFC viewer:", e);
+      toast({
+        variant: "destructive",
+        title: "Viewer initialization failed",
+        description: "Could not initialize the 3D viewer.",
+      });
     }
   };
-  
-  const renderLasVisualization = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    // Clear the canvas
-    ctx.clearRect(0, 0, width, height);
-    
-    // Background
-    ctx.fillStyle = '#222222';
-    ctx.fillRect(0, 0, width, height);
-    
-    const centerX = width / 2 + viewPosition.x * zoomLevel;
-    const centerY = height / 2 + viewPosition.y * zoomLevel;
-    
-    // Make grid much more visible
-    ctx.strokeStyle = 'rgba(150, 150, 150, 0.8)';
-    ctx.lineWidth = 1;
-    
-    const gridSize = 50 * zoomLevel;
-    const gridExtent = 2000;
-    
-    // Draw grid lines
-    for (let x = -gridExtent; x <= gridExtent; x += gridSize / zoomLevel) {
-      // Center line brighter (X axis)
-      if (Math.abs(x) < 1) {
-        ctx.strokeStyle = 'rgba(255, 50, 50, 1.0)'; // Bright red
-        ctx.lineWidth = 3;
-      } else {
-        ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
-        ctx.lineWidth = 1;
-      }
-      
-      ctx.beginPath();
-      ctx.moveTo(centerX + x * zoomLevel, centerY - gridExtent * zoomLevel);
-      ctx.lineTo(centerX + x * zoomLevel, centerY + gridExtent * zoomLevel);
-      ctx.stroke();
-    }
-    
-    for (let y = -gridExtent; y <= gridExtent; y += gridSize / zoomLevel) {
-      // Center line brighter (Y axis)
-      if (Math.abs(y) < 1) {
-        ctx.strokeStyle = 'rgba(50, 255, 50, 1.0)'; // Bright green
-        ctx.lineWidth = 3;
-      } else {
-        ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
-        ctx.lineWidth = 1;
-      }
-      
-      ctx.beginPath();
-      ctx.moveTo(centerX - gridExtent * zoomLevel, centerY + y * zoomLevel);
-      ctx.lineTo(centerX + gridExtent * zoomLevel, centerY + y * zoomLevel);
-      ctx.stroke();
-    }
-    
-    // Mark origin with a larger circle
-    ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, 6 * zoomLevel, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Draw axes with increased size and visibility
-    // X axis (red)
-    ctx.strokeStyle = '#ff3333';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX + 150 * zoomLevel, centerY);
-    ctx.stroke();
-    
-    // Y axis (green)
-    ctx.strokeStyle = '#33ff33';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX, centerY - 150 * zoomLevel);
-    ctx.stroke();
-    
-    // Z axis (blue)
-    ctx.strokeStyle = '#3333ff';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX - 75 * zoomLevel, centerY + 75 * zoomLevel);
-    ctx.stroke();
-    
-    // Label the axes with larger and more visible text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText("X", centerX + 160 * zoomLevel, centerY + 20);
-    ctx.fillText("Y", centerX - 20, centerY - 160 * zoomLevel);
-    ctx.fillText("Z", centerX - 85 * zoomLevel, centerY + 95 * zoomLevel);
-    
-    // Mark the origin more visibly
-    ctx.font = 'bold 18px sans-serif';
-    ctx.fillText("Origen (0,0,0)", centerX, centerY + 35);
-    
-    // Add a reference cube to the visualization
-    const cubeSize = 40 * zoomLevel;
-    const halfCubeSize = cubeSize / 2;
-    
-    // Cube center at origin
-    ctx.strokeStyle = '#4f46e5';
-    ctx.lineWidth = 2 * zoomLevel;
-    
-    // Front face
-    ctx.beginPath();
-    ctx.moveTo(centerX - halfCubeSize, centerY - halfCubeSize);
-    ctx.lineTo(centerX + halfCubeSize, centerY - halfCubeSize);
-    ctx.lineTo(centerX + halfCubeSize, centerY + halfCubeSize);
-    ctx.lineTo(centerX - halfCubeSize, centerY + halfCubeSize);
-    ctx.lineTo(centerX - halfCubeSize, centerY - halfCubeSize);
-    ctx.stroke();
-    
-    // Back face
-    ctx.beginPath();
-    ctx.moveTo(centerX - halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
-    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
-    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
-    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
-    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
-    ctx.stroke();
-    
-    // Connecting edges
-    ctx.beginPath();
-    ctx.moveTo(centerX - halfCubeSize, centerY - halfCubeSize);
-    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX + halfCubeSize, centerY - halfCubeSize);
-    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX + halfCubeSize, centerY + halfCubeSize);
-    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX - halfCubeSize, centerY + halfCubeSize);
-    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
-    ctx.stroke();
-    
-    // Draw point cloud
-    ctx.fillStyle = 'rgba(100, 149, 237, 0.7)';
-    const pointCount = 25000; // Increased point count for more densely populated visualization
-    const spread = 300 * zoomLevel;
-    
-    // Generate pseudo-random points but in a stable pattern to simulate a real point cloud
-    const seed = 12345;
-    const pseudoRandom = (i: number, offset: number = 0) => {
-      return (Math.sin(i * seed + offset) + 1) / 2;
-    };
-    
-    // Draw points in a more realistic point cloud pattern
-    for (let i = 0; i < pointCount; i++) {
-      // Create a more realistic distribution of points
-      const angle = pseudoRandom(i, 100) * Math.PI * 2;
-      const distFromCenter = Math.pow(pseudoRandom(i, 200), 0.5) * spread; // More points at the center
-      const heightVariation = (pseudoRandom(i, 300) - 0.5) * spread * 0.4; // Vertical variation
-      
-      // X and Y coordinates in a disc pattern with height variation 
-      const x = centerX + Math.cos(angle) * distFromCenter;
-      const y = centerY + Math.sin(angle) * distFromCenter + heightVariation;
-      
-      // Size and color depends on distance from center to simulate depth
-      const distanceFromCenter = Math.sqrt(
-        Math.pow((x - centerX) / zoomLevel, 2) + Math.pow((y - centerY) / zoomLevel, 2)
-      );
-      
-      // Color varies with distance to create visual depth
-      const intensity = Math.max(0, 1 - distanceFromCenter / (spread / zoomLevel * 1.2));
-      const hue = 210; // Blue hue
-      const saturation = 80 + Math.floor(intensity * 20); // More saturated closer to center
-      const lightness = 50 + Math.floor((1-intensity) * 30); // Brighter in the distance
-      
-      // Size varies with distance - slightly smaller in distance for better depth perception
-      const size = Math.max(0.8, 2 * zoomLevel * intensity);
-      
-      ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${0.6 + intensity * 0.3})`;
-      
-      // Draw point
-      ctx.beginPath();
-      ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    
-    // Add file info
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.fillText(`${fileName} (${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size'})`, width / 2, 30);
-    ctx.fillText("Nube de puntos centrada en el origen (0,0,0)", width / 2, 55);
-    
-    // Highlight selected item if any
-    if (selectedItem) {
-      ctx.fillStyle = 'rgba(255, 255, 0, 0.2)';
-      ctx.fillRect(0, 0, width, height);
-      ctx.fillStyle = '#FFFF00';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText(`Selected: ${selectedItem}`, width / 2, height - 20);
-    }
-  };
-  
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
@@ -535,63 +155,16 @@ const Viewer = () => {
     navigate('/');
   };
   
-  const resetView = () => {
-    if (fileType === 'ifc' && viewerRef.current) {
-      // Reset IFC view to origin
-      try {
-        // Mostrar el origen primero
-        viewerRef.current.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
-        viewerRef.current.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
-        
-        // Luego encajar el modelo si existe
-        const scene = viewerRef.current.context.getScene();
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
-        
-        toast({
-          variant: "default",
-          title: "Vista Reiniciada",
-          description: "Vista centrada en el origen (0,0,0)"
-        });
-      } catch (e) {
-        console.error("Error resetting view:", e);
-      }
-    } else if (fileType === 'las') {
-      // Reset LAS view to origin
-      setZoomLevel(1.0);
-      setViewPosition({ x: 0, y: 0 });
-      
-      // Re-render with reset values
-      if (canvasRef.current) {
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) {
-          renderLasVisualization(ctx, canvasRef.current.width, canvasRef.current.height);
-        }
-      }
-      
-      toast({
-        variant: "default",
-        title: "Vista Reiniciada",
-        description: "Vista centrada en el origen (0,0,0)"
-      });
-    }
-  };
-  
-  const expandModel = () => {
-    if (fileType === 'ifc' && viewerRef.current) {
-      toggleFullscreen();
-    } else if (fileType === 'las') {
-      toggleFullscreen();
-    }
-  };
-  
   // If loading, show loader
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#222222] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4 mx-auto"></div>
-          <p className="text-white text-lg">Cargando visualizador...</p>
-          <p className="text-gray-400 text-sm mt-2">Preparando {fileName}</p>
+          <p className="text-white text-lg">Loading viewer...</p>
+          <p className="text-gray-400 text-sm mt-2">
+            {isDemoMode ? "Preparing demo environment" : `Loading ${files.length} file(s)`}
+          </p>
         </div>
       </div>
     );
@@ -610,36 +183,42 @@ const Viewer = () => {
             </SheetTrigger>
             <SheetContent side="left" className="bg-[#333333] border-r border-[#444444] text-white w-64 p-0">
               <div className="p-4 border-b border-[#444444]">
-                <h2 className="text-lg font-medium">Explorador</h2>
+                <h2 className="text-lg font-medium">Files</h2>
               </div>
               <div className="p-4">
-                <h3 className="text-sm font-medium mb-2">ARCHIVO</h3>
+                <h3 className="text-sm font-medium mb-2">LOADED FILES</h3>
                 <ul>
-                  <li className="py-1 px-2 rounded hover:bg-[#444444] cursor-pointer text-sm flex items-center">
-                    <File className="h-4 w-4 mr-2" /> {fileName || "No hay modelo cargado"}
-                  </li>
+                  {files.length > 0 ? (
+                    files.map((file, index) => (
+                      <li 
+                        key={index}
+                        className={`py-1 px-2 rounded cursor-pointer text-sm flex items-center ${selectedItem === file.fileName ? 'bg-[#444444]' : 'hover:bg-[#3a3a3a]'}`}
+                        onClick={() => setSelectedItem(file.fileName)}
+                      >
+                        <File className="h-4 w-4 mr-2" /> 
+                        {file.fileName} <span className="ml-2 text-xs opacity-50">{file.fileType.toUpperCase()}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="py-1 px-2 text-sm text-gray-400">
+                      Demo mode - no files loaded
+                    </li>
+                  )}
                 </ul>
               </div>
             </SheetContent>
           </Sheet>
           
           <div className="ml-4 text-white font-medium">
-            {fileType === 'ifc' ? 'Visualizador IFC' : 'Visualizador LAS'} - {fileName}
+            {files.length > 0 
+              ? `3D Viewer - ${files.length} file(s)` 
+              : "3D Viewer - Demo Mode"}
           </div>
         </div>
         
         <div className="flex items-center space-x-1">
           <Button variant="ghost" size="icon" onClick={goBack} className="text-white hover:bg-[#444444]">
             <X className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white hover:bg-[#444444]"
-            onClick={resetView}
-            title="Centrar en origen (0,0,0)"
-          >
-            <Axis3d className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-white hover:bg-[#444444]">
             {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
@@ -651,26 +230,51 @@ const Viewer = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Main Viewer Area */}
         <main className="flex-1 relative">
-          {fileType === 'ifc' ? (
+          {/* IFC files need the IFC viewer */}
+          {files.some(f => f.fileType === 'ifc') && (
             <div 
               ref={containerRef} 
               className="w-full h-full"
-              style={{ visibility: viewerInitialized ? 'visible' : 'hidden' }}
             >
               {/* IFC Viewer will be initialized here */}
             </div>
-          ) : (
-            <canvas
-              ref={canvasRef}
-              className="w-full h-full"
-            />
           )}
           
-          {/* Instrucciones de navegación superpuestas */}
+          {/* LAS files use React Three Fiber */}
+          {files.some(f => f.fileType === 'las') && !files.some(f => f.fileType === 'ifc') && (
+            <div className="w-full h-full">
+              <Canvas>
+                <ViewerContainer>
+                  {files.filter(f => f.fileType === 'las').map((file, index) => (
+                    <PointCloudViewer
+                      key={index}
+                      url={file.fileUrl}
+                      color="#4f46e5"
+                      opacity={0.8}
+                    />
+                  ))}
+                </ViewerContainer>
+              </Canvas>
+            </div>
+          )}
+          
+          {/* Demo mode when no files */}
+          {files.length === 0 && (
+            <div className="w-full h-full">
+              <Canvas>
+                <ViewerContainer>
+                  {/* Demo point cloud */}
+                  <PointCloudViewer />
+                </ViewerContainer>
+              </Canvas>
+            </div>
+          )}
+          
+          {/* Overlay with instructions */}
           <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded">
             <div className="flex items-center gap-2 text-sm">
               <Axis3d className="h-4 w-4" /> 
-              <span>Origen (0,0,0) visible con ejes X, Y, Z</span>
+              <span>Origin (0,0,0) with X, Y, Z axes</span>
             </div>
           </div>
           
@@ -679,11 +283,14 @@ const Viewer = () => {
             <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
               <div className="flex items-center gap-2">
                 <File className="h-4 w-4" /> 
-                <span>{fileName}</span>
-                <span className="text-xs bg-[#444444] px-2 py-1 rounded">{fileType?.toUpperCase()}</span>
+                <span>
+                  {files.length > 0 
+                    ? `${files.length} file(s) loaded` 
+                    : "Demo Mode"}
+                </span>
               </div>
               <div className="text-xs text-gray-300 mt-1">
-                Posición: Origen (0,0,0)
+                Use mouse to navigate: drag to rotate, scroll to zoom
               </div>
             </div>
           </div>
@@ -691,41 +298,13 @@ const Viewer = () => {
           {/* Viewer Controls */}
           <div className="absolute top-4 right-4 flex flex-col space-y-2">
             <Button 
-              onClick={resetView}
-              variant="outline" 
-              size="icon"
-              title="Centrar en origen (0,0,0)"
-              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
-            >
-              <Move className="h-5 w-5" />
-            </Button>
-            <Button 
               onClick={toggleFullscreen}
               variant="outline" 
               size="icon"
-              title="Pantalla completa"
+              title="Toggle fullscreen"
               className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
             >
               {isFullscreen ? <MinimizeIcon className="h-5 w-5" /> : <MaximizeIcon className="h-5 w-5" />}
-            </Button>
-            <Button 
-              onClick={() => {
-                if (fileType === 'las') {
-                  setZoomLevel(prev => Math.min(5.0, prev + 0.2));
-                  if (canvasRef.current) {
-                    const ctx = canvasRef.current.getContext('2d');
-                    if (ctx) renderLasVisualization(ctx, canvasRef.current.width, canvasRef.current.height);
-                  }
-                } else if (viewerRef.current) {
-                  viewerRef.current.context.ifcCamera.cameraControls.zoom(1.2);
-                }
-              }}
-              variant="outline" 
-              size="icon"
-              title="Aumentar zoom"
-              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
-            >
-              <ZoomIn className="h-5 w-5" />
             </Button>
           </div>
         </main>
@@ -733,8 +312,8 @@ const Viewer = () => {
       
       {/* Status bar */}
       <footer className="h-6 bg-[#333333] border-t border-[#444444] text-[#AAAAAA] text-xs px-4 flex items-center">
-        <span>Listo</span>
-        <span className="ml-auto">{fileType?.toUpperCase()} Viewer</span>
+        <span>Ready</span>
+        <span className="ml-auto">3D Viewer</span>
       </footer>
     </div>
   );
