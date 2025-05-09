@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -15,8 +15,12 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [loadingModel, setLoadingModel] = useState(true);
 
   useEffect(() => {
+    // Log info for debugging
+    console.log("ModelViewer received:", { fileType, fileName });
+    
     if (!fileType || !fileName) {
       toast({
         variant: "destructive",
@@ -26,70 +30,91 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
       return;
     }
 
-    // Initialize canvas rendering - this would be replaced with actual 3D library code
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Mock rendering to show something is working
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Background gradient
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, '#f0f4ff');
-        gradient.addColorStop(1, '#e0e7ff');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setLoadingModel(true);
 
-        // Draw grid
-        ctx.strokeStyle = 'rgba(79, 70, 229, 0.2)';
-        ctx.lineWidth = 1;
-        const gridSize = 40;
-        for (let x = 0; x <= canvas.width; x += gridSize) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, canvas.height);
-          ctx.stroke();
-        }
-        
-        for (let y = 0; y <= canvas.height; y += gridSize) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-          ctx.stroke();
-        }
-        
-        // Draw model placeholder
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        
-        if (fileType === 'ifc') {
-          // IFC building placeholder
-          ctx.fillStyle = 'rgba(79, 70, 229, 0.7)';
-          ctx.fillRect(centerX - 100, centerY - 100, 200, 200);
-          ctx.fillStyle = 'rgba(79, 70, 229, 0.5)';
-          ctx.fillRect(centerX - 120, centerY - 80, 240, 160);
-        } else {
-          // LAS point cloud placeholder
-          ctx.fillStyle = 'rgba(79, 70, 229, 0.5)';
-          for (let i = 0; i < 1000; i++) {
-            const x = centerX + (Math.random() - 0.5) * 300;
-            const y = centerY + (Math.random() - 0.5) * 300;
+    // Simulate model loading with a delay
+    const loadTimeout = setTimeout(() => {
+      setLoadingModel(false);
+      
+      // Initialize canvas rendering
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // Mock rendering to show something is working
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          // Background gradient
+          const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+          gradient.addColorStop(0, '#f0f4ff');
+          gradient.addColorStop(1, '#e0e7ff');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw grid
+          ctx.strokeStyle = 'rgba(79, 70, 229, 0.2)';
+          ctx.lineWidth = 1;
+          const gridSize = 40;
+          for (let x = 0; x <= canvas.width; x += gridSize) {
             ctx.beginPath();
-            ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
           }
+          
+          for (let y = 0; y <= canvas.height; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+          }
+          
+          // Draw model placeholder
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          
+          if (fileType === 'ifc') {
+            // IFC building placeholder
+            ctx.fillStyle = 'rgba(79, 70, 229, 0.7)';
+            ctx.fillRect(centerX - 100, centerY - 100, 200, 200);
+            ctx.fillStyle = 'rgba(79, 70, 229, 0.5)';
+            ctx.fillRect(centerX - 120, centerY - 80, 240, 160);
+            
+            // Add a label
+            ctx.fillStyle = '#1e293b';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText("IFC Building Model", centerX, centerY);
+          } else {
+            // LAS point cloud placeholder
+            ctx.fillStyle = 'rgba(79, 70, 229, 0.5)';
+            for (let i = 0; i < 1000; i++) {
+              const x = centerX + (Math.random() - 0.5) * 300;
+              const y = centerY + (Math.random() - 0.5) * 300;
+              ctx.beginPath();
+              ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            
+            // Add a label
+            ctx.fillStyle = '#1e293b';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText("LAS Point Cloud", centerX, centerY - 120);
+          }
+          
+          // Draw file info
+          ctx.fillStyle = '#1e293b';
+          ctx.font = '16px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${fileType.toUpperCase()} File: ${fileName}`, centerX, 40);
+          ctx.font = '14px sans-serif';
+          ctx.fillText('(3D visualization would appear here with three.js)', centerX, canvas.height - 30);
         }
-        
-        // Draw file info
-        ctx.fillStyle = '#1e293b';
-        ctx.font = '16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${fileType.toUpperCase()} File: ${fileName}`, centerX, 40);
-        ctx.font = '14px sans-serif';
-        ctx.fillText('(3D visualization would appear here with three.js)', centerX, canvas.height - 30);
       }
-    }
+    }, 800); // Simulate loading time
+    
+    return () => clearTimeout(loadTimeout);
   }, [fileType, fileName, toast]);
 
   return (
@@ -111,6 +136,12 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
               Upload IFC or LAS files from the main page to visualize them in 3D.
             </p>
             <Button onClick={() => navigate('/')}>Go to Upload Page</Button>
+          </div>
+        ) : loadingModel ? (
+          <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+            <h3 className="text-xl font-medium mb-2">Cargando Modelo</h3>
+            <p className="text-muted-foreground">Preparando la visualización del modelo {fileName}</p>
           </div>
         ) : (
           <div className="p-4">

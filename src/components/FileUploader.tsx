@@ -126,17 +126,28 @@ const FileUploader: React.FC = () => {
       const fileExtension = successFile.name.split('.').pop()?.toLowerCase();
       const fileType = fileExtension === 'ifc' ? 'ifc' : fileExtension === 'las' ? 'las' : null;
       
+      // Log information for debugging
+      console.log("Navigating to viewer with:", { fileType, fileName: successFile.name });
+      
       navigate('/viewer', { state: { fileType, fileName: successFile.name } });
     } else {
+      // Show more detailed error message
       toast({
         variant: "destructive",
         title: "No uploaded files",
         description: "Please upload at least one file successfully before viewing.",
       });
+      
+      // Log debugging info about current files
+      console.log("Current files:", files);
+      console.log("Successful files:", files.filter(f => f.status === "success"));
     }
   };
 
   const hasSuccessfulFiles = files.some((file) => file.status === "success");
+  
+  // Add debug info to help troubleshoot
+  console.log("Has successful files:", hasSuccessfulFiles);
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
