@@ -29,6 +29,7 @@ import { handleFrameAll as utilsHandleFrameAll, debugViewer } from "@/components
 import ViewerSidebar from "@/components/viewer/ViewerSidebar";
 import ViewerControls from "@/components/viewer/ViewerControls";
 import ViewerLayout from "@/components/viewer/ViewerLayout";
+import { useIFCViewer } from "@/hooks/useIFCViewer"; // Add the import for useIFCViewer hook
 
 // Type definitions for the file data
 interface FileData {
@@ -442,12 +443,19 @@ const Viewer = () => {
   return (
     <ViewerLayout
       title={viewerTitle}
-      onClose={goBack}
+      onClose={() => navigate('/')}
       onToggleFullscreen={toggleFullscreen}
-      onDebug={handleDebug}
+      onDebug={() => {
+        if (viewerRef.current) {
+          debugViewer(viewerRef, toast);
+        } else {
+          console.log("Viewer not initialized");
+          console.log("Files:", files);
+        }
+      }}
       isFullscreen={isFullscreen}
       files={files}
-      viewer={viewerRef.current}
+      viewer={viewerRef.current || currentViewer.viewer}
       fileUrl={currentFileUrl}
       fileName={currentFileName}
       // Pass diagnostic status

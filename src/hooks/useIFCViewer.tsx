@@ -144,8 +144,6 @@ export const useIFCViewer = (
     // For compatibility with current consumers of the hook
     isInitialized: ready,
     isLoading: loading,
-    modelLoaded: modelLoaded,
-    meshExists: meshExists,
     // Keep any methods that might be used elsewhere
     frameAll: () => {
       if (mesh && viewerRef.current) {

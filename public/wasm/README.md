@@ -24,3 +24,4 @@ Opción 2: Descargar desde CDN:
 - https://unpkg.com/web-ifc@0.0.x/dist/web-ifc-mt.worker.js
 
 Reemplaza x con el número de versión que coincida con tu dependencia web-ifc-viewer.
+
