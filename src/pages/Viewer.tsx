@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -186,7 +185,10 @@ const Viewer = () => {
             
             // Fit to model after loading
             setTimeout(() => {
-              viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+              if (viewer && model && model.mesh) {
+                // Fixed: Pass true as the second argument instead of an object
+                viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+              }
             }, 500);
             
             toast({
@@ -210,7 +212,10 @@ const Viewer = () => {
               
               // Fit to model after loading
               setTimeout(() => {
-                viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+                if (model && model.mesh) {
+                  // Fixed: Pass true as the second argument instead of an object
+                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+                }
               }, 500);
             } catch (e) {
               console.error("Error loading example model:", e);

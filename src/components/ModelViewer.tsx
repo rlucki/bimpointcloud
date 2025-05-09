@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -91,8 +90,8 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
               // Fit to model after loading - FIX: Ensure mesh is properly passed to fitToSphere
               setTimeout(() => {
                 if (viewer && model && model.mesh) {
-                  // The second argument (true) needs to be passed as the options object { fit: true }
-                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, { fit: true });
+                  // Fix: Changed from object parameter to boolean parameter
+                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
                 }
               }, 500);
               
