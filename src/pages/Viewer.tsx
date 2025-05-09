@@ -16,7 +16,8 @@ import {
   MaximizeIcon,
   Move,
   ZoomIn,
-  Square
+  Square,
+  Axis3d
 } from "lucide-react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -88,16 +89,24 @@ const Viewer = () => {
         // Center the model at 0,0,0
         viewer.context.getScene().position.set(0, 0, 0);
         
-        // Set up camera
-        viewer.context.ifcCamera.cameraControls.setPosition(10, 10, 10);
+        // Set up camera - position farther back for better initial view
+        viewer.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
         viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
         
-        // Add grid for better spatial reference
-        const grid = new THREE.GridHelper(50, 50, 0x555555, 0x333333);
+        // Mejorar la cuadrícula para que sea más visible
+        const gridSize = 100;
+        const gridDivisions = 100;
+        const gridColor = 0x888888;
+        const gridColorCenterLines = 0xffffff;
+        
+        // Crear una cuadrícula más grande y visible
+        const grid = new THREE.GridHelper(gridSize, gridDivisions, gridColorCenterLines, gridColor);
+        grid.position.set(0, 0, 0); // Asegurar que está en el origen
         viewer.context.getScene().add(grid);
         
-        // Add axes helper
-        const axesHelper = new THREE.AxesHelper(5);
+        // Añadir ejes de coordenadas más grandes y visibles
+        const axesHelper = new THREE.AxesHelper(15); // Tamaño aumentado para mejor visibilidad
+        axesHelper.position.set(0, 0.1, 0); // Ligeramente por encima de la cuadrícula para evitar z-fighting
         viewer.context.getScene().add(axesHelper);
         
         // Check if there's a file URL to load
@@ -108,7 +117,7 @@ const Viewer = () => {
             // Load the actual IFC model
             const model = await viewer.IFC.loadIfcUrl(fileUrl);
             
-            // Center and adjust camera to the loaded model
+            // Enable shadows for better visualization
             viewer.shadowDropper.renderShadow(model.modelID);
             
             // Fit the model in the view
@@ -116,42 +125,57 @@ const Viewer = () => {
             
             // Center view on the model - Fix: providing both required parameters
             setTimeout(() => {
-              // Fixed: Providing both mesh and immediate parameters
+              // Start with a view of the origin to help user orient
+              viewer.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
+              viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+              
+              // Then adjust to fit the model
               viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+              
               toast({
-                title: "IFC Model Loaded",
-                description: `${fileName} loaded successfully`
+                variant: "default",
+                title: "Modelo IFC Cargado",
+                description: `${fileName} cargado exitosamente. Use el mouse para navegar.`
               });
             }, 500);
           } catch (e) {
             console.error("Error loading IFC model:", e);
             toast({
               variant: "destructive",
-              title: "Model loading error",
-              description: "Could not load the IFC model. Using placeholder instead."
+              title: "Error al cargar el modelo",
+              description: "No se pudo cargar el modelo IFC. Mostrando modelo de ejemplo."
             });
             
-            // If loading fails, show a placeholder cube as fallback
-            const geometry = new THREE.BoxGeometry(3, 3, 3);
+            // If loading fails, show a placeholder cube at the origin
+            const geometry = new THREE.BoxGeometry(5, 5, 5);
             const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
             const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(0, 1.5, 0);
+            cube.position.set(0, 2.5, 0); // Colocado justo en el origen, elevado para que se vea sobre la cuadrícula
             viewer.context.getScene().add(cube);
+            
+            // Reset camera to show the origin and cube
+            viewer.context.ifcCamera.cameraControls.setPosition(15, 15, 15);
+            viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
           }
         } else {
           // No file URL, so we'll show a placeholder
           console.log("No IFC file URL provided. Showing placeholder cube.");
           toast({
             variant: "default",
-            title: "Demo Mode",
-            description: "No IFC file provided. Showing placeholder model."
+            title: "Modo Demo",
+            description: "No se proporcionó archivo IFC. Mostrando modelo de ejemplo."
           });
           
-          const geometry = new THREE.BoxGeometry(3, 3, 3);
+          // Crear un cubo grande y colorido en el origen como referencia
+          const geometry = new THREE.BoxGeometry(5, 5, 5);
           const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
           const cube = new THREE.Mesh(geometry, material);
-          cube.position.set(0, 1.5, 0);
+          cube.position.set(0, 2.5, 0); // Elevado para que se vea sobre la cuadrícula
           viewer.context.getScene().add(cube);
+          
+          // Reset camera to show the origin and cube
+          viewer.context.ifcCamera.cameraControls.setPosition(15, 15, 15);
+          viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
         }
         
         setViewerInitialized(true);
@@ -160,8 +184,8 @@ const Viewer = () => {
         console.error("Error initializing IFC viewer:", e);
         toast({
           variant: "destructive",
-          title: "Visualization error",
-          description: "Could not initialize the IFC viewer.",
+          title: "Error de visualización",
+          description: "No se pudo inicializar el visualizador IFC.",
         });
       }
     } else if (fileType === 'las' && canvasRef.current) {
@@ -230,8 +254,9 @@ const Viewer = () => {
         setViewerInitialized(true);
         
         toast({
-          title: "LAS Viewer Ready",
-          description: "Point cloud visualization at origin (0,0,0)"
+          variant: "default",
+          title: "Visualizador LAS Listo",
+          description: "Visualización de nube de puntos centrada en el origen (0,0,0)"
         });
         
         return () => {
@@ -257,15 +282,24 @@ const Viewer = () => {
     const centerX = width / 2 + viewPosition.x * zoomLevel;
     const centerY = height / 2 + viewPosition.y * zoomLevel;
     
-    // Grid
-    ctx.strokeStyle = 'rgba(80, 80, 80, 0.3)';
+    // Mejorar la visibilidad de la cuadrícula
+    ctx.strokeStyle = 'rgba(120, 120, 120, 0.6)';
     ctx.lineWidth = 1;
     
     const gridSize = 50 * zoomLevel;
     const gridExtent = 2000;
     
-    // Draw grid lines
+    // Dibujar líneas de cuadrícula
     for (let x = -gridExtent; x <= gridExtent; x += gridSize / zoomLevel) {
+      // Línea central más brillante (eje X)
+      if (Math.abs(x) < 1) {
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = 'rgba(120, 120, 120, 0.4)';
+        ctx.lineWidth = 1;
+      }
+      
       ctx.beginPath();
       ctx.moveTo(centerX + x * zoomLevel, centerY - gridExtent * zoomLevel);
       ctx.lineTo(centerX + x * zoomLevel, centerY + gridExtent * zoomLevel);
@@ -273,43 +307,63 @@ const Viewer = () => {
     }
     
     for (let y = -gridExtent; y <= gridExtent; y += gridSize / zoomLevel) {
+      // Línea central más brillante (eje Y)
+      if (Math.abs(y) < 1) {
+        ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+        ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = 'rgba(120, 120, 120, 0.4)';
+        ctx.lineWidth = 1;
+      }
+      
       ctx.beginPath();
       ctx.moveTo(centerX - gridExtent * zoomLevel, centerY + y * zoomLevel);
       ctx.lineTo(centerX + gridExtent * zoomLevel, centerY + y * zoomLevel);
       ctx.stroke();
     }
     
-    // Draw axes
+    // Marcar el origen con un círculo para que sea más evidente
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 4 * zoomLevel, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw axes with increased size and visibility
     // X axis (red)
     ctx.strokeStyle = '#ff3333';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX + 100 * zoomLevel, centerY);
+    ctx.lineTo(centerX + 150 * zoomLevel, centerY);
     ctx.stroke();
     
     // Y axis (green)
     ctx.strokeStyle = '#33ff33';
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX, centerY - 100 * zoomLevel);
+    ctx.lineTo(centerX, centerY - 150 * zoomLevel);
     ctx.stroke();
     
     // Z axis (blue)
     ctx.strokeStyle = '#3333ff';
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX - 50 * zoomLevel, centerY + 50 * zoomLevel);
+    ctx.lineTo(centerX - 75 * zoomLevel, centerY + 75 * zoomLevel);
     ctx.stroke();
     
-    // Axis labels
+    // Etiquetar los ejes con texto más grande y visible
     ctx.fillStyle = '#ffffff';
-    ctx.font = '14px sans-serif';
+    ctx.font = '18px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText("X", centerX + 110 * zoomLevel, centerY + 15);
-    ctx.fillText("Y", centerX - 15, centerY - 110 * zoomLevel);
-    ctx.fillText("Z", centerX - 60 * zoomLevel, centerY + 65 * zoomLevel);
-    ctx.fillText("(0,0,0)", centerX, centerY + 20);
+    ctx.fillText("X", centerX + 160 * zoomLevel, centerY + 20);
+    ctx.fillText("Y", centerX - 20, centerY - 160 * zoomLevel);
+    ctx.fillText("Z", centerX - 85 * zoomLevel, centerY + 95 * zoomLevel);
+    
+    // Marcar el origen de manera más visible
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText("Origen (0,0,0)", centerX, centerY + 30);
     
     // Draw point cloud
     ctx.fillStyle = 'rgba(100, 149, 237, 0.7)';
@@ -358,7 +412,7 @@ const Viewer = () => {
     // Add file info
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.fillText(`${fileName} (${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size'})`, width / 2, 30);
-    ctx.fillText("Point cloud centered at origin (0,0,0)", width / 2, 55);
+    ctx.fillText("Nube de puntos centrada en el origen (0,0,0)", width / 2, 55);
     
     // Highlight selected item if any
     if (selectedItem) {
@@ -394,20 +448,26 @@ const Viewer = () => {
   
   const resetView = () => {
     if (fileType === 'ifc' && viewerRef.current) {
-      // Reset IFC view to show the whole model
+      // Reset IFC view to origin
       try {
-        // Fix: Properly calling fitToSphere with both required parameters
+        // Mostrar el origen primero
+        viewerRef.current.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
+        viewerRef.current.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+        
+        // Luego encajar el modelo si existe
         const scene = viewerRef.current.context.getScene();
         viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
+        
         toast({
-          title: "View Reset",
-          description: "IFC model centered in view"
+          variant: "default",
+          title: "Vista Reiniciada",
+          description: "Vista centrada en el origen (0,0,0)"
         });
       } catch (e) {
         console.error("Error resetting view:", e);
       }
     } else if (fileType === 'las') {
-      // Reset LAS view
+      // Reset LAS view to origin
       setZoomLevel(1.0);
       setViewPosition({ x: 0, y: 0 });
       
@@ -420,8 +480,9 @@ const Viewer = () => {
       }
       
       toast({
-        title: "View Reset",
-        description: "Point cloud centered in view"
+        variant: "default",
+        title: "Vista Reiniciada",
+        description: "Vista centrada en el origen (0,0,0)"
       });
     }
   };
@@ -440,8 +501,8 @@ const Viewer = () => {
       <div className="min-h-screen bg-[#222222] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4 mx-auto"></div>
-          <p className="text-white text-lg">Loading viewer...</p>
-          <p className="text-gray-400 text-sm mt-2">Preparing {fileName}</p>
+          <p className="text-white text-lg">Cargando visualizador...</p>
+          <p className="text-gray-400 text-sm mt-2">Preparando {fileName}</p>
         </div>
       </div>
     );
@@ -460,13 +521,13 @@ const Viewer = () => {
             </SheetTrigger>
             <SheetContent side="left" className="bg-[#333333] border-r border-[#444444] text-white w-64 p-0">
               <div className="p-4 border-b border-[#444444]">
-                <h2 className="text-lg font-medium">Project Explorer</h2>
+                <h2 className="text-lg font-medium">Explorador</h2>
               </div>
               <div className="p-4">
-                <h3 className="text-sm font-medium mb-2">MODELS</h3>
+                <h3 className="text-sm font-medium mb-2">ARCHIVO</h3>
                 <ul>
                   <li className="py-1 px-2 rounded hover:bg-[#444444] cursor-pointer text-sm flex items-center">
-                    <File className="h-4 w-4 mr-2" /> {fileName || "No model loaded"}
+                    <File className="h-4 w-4 mr-2" /> {fileName || "No hay modelo cargado"}
                   </li>
                 </ul>
               </div>
@@ -474,67 +535,31 @@ const Viewer = () => {
           </Sheet>
           
           <div className="ml-4 text-white font-medium">
-            {fileType === 'ifc' ? 'IFC Viewer' : 'LAS Viewer'} - {fileName}
+            {fileType === 'ifc' ? 'Visualizador IFC' : 'Visualizador LAS'} - {fileName}
           </div>
         </div>
         
         <div className="flex items-center space-x-1">
-          <Menubar className="border-none bg-transparent">
-            <MenubarMenu>
-              <MenubarTrigger className="text-white hover:bg-[#444444] data-[state=open]:bg-[#444444]">File</MenubarTrigger>
-              <MenubarContent className="bg-[#333333] border-[#444444] text-white">
-                <MenubarItem>Open</MenubarItem>
-                <MenubarItem>Save</MenubarItem>
-                <MenubarItem>Export</MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
-            <MenubarMenu>
-              <MenubarTrigger className="text-white hover:bg-[#444444] data-[state=open]:bg-[#444444]">View</MenubarTrigger>
-              <MenubarContent className="bg-[#333333] border-[#444444] text-white">
-                <MenubarItem>Properties</MenubarItem>
-                <MenubarItem>Layers</MenubarItem>
-                <MenubarItem>Models</MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
-            <MenubarMenu>
-              <MenubarTrigger className="text-white hover:bg-[#444444] data-[state=open]:bg-[#444444]">Tools</MenubarTrigger>
-              <MenubarContent className="bg-[#333333] border-[#444444] text-white">
-                <MenubarItem>Measure</MenubarItem>
-                <MenubarItem>Cut</MenubarItem>
-                <MenubarItem>Annotate</MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
-            <MenubarMenu>
-              <MenubarTrigger className="text-white hover:bg-[#444444] data-[state=open]:bg-[#444444]">Help</MenubarTrigger>
-              <MenubarContent className="bg-[#333333] border-[#444444] text-white">
-                <MenubarItem>About</MenubarItem>
-                <MenubarItem>Documentation</MenubarItem>
-                <MenubarItem>Keyboard Shortcuts</MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
-          </Menubar>
-          
-          <div className="flex items-center ml-2">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-[#444444]" onClick={goBack}>
-              <X className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-white hover:bg-[#444444]">
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-white hover:bg-[#444444]">
-              <Settings className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-white hover:bg-[#444444]">
-              {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" onClick={goBack} className="text-white hover:bg-[#444444]">
+            <X className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-white hover:bg-[#444444]"
+            onClick={resetView}
+            title="Centrar en origen (0,0,0)"
+          >
+            <Axis3d className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-white hover:bg-[#444444]">
+            {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
+          </Button>
         </div>
       </header>
       
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* The sidebar has been completely removed as requested */}
-        
         {/* Main Viewer Area */}
         <main className="flex-1 relative">
           {fileType === 'ifc' ? (
@@ -552,6 +577,14 @@ const Viewer = () => {
             />
           )}
           
+          {/* Instrucciones de navegación superpuestas */}
+          <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded">
+            <div className="flex items-center gap-2 text-sm">
+              <Axis3d className="h-4 w-4" /> 
+              <span>Origen (0,0,0) visible con ejes X, Y, Z</span>
+            </div>
+          </div>
+          
           {/* File info overlay */}
           <div className="absolute bottom-4 right-4">
             <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
@@ -561,7 +594,7 @@ const Viewer = () => {
                 <span className="text-xs bg-[#444444] px-2 py-1 rounded">{fileType?.toUpperCase()}</span>
               </div>
               <div className="text-xs text-gray-300 mt-1">
-                Position: Origin (0,0,0)
+                Posición: Origen (0,0,0)
               </div>
             </div>
           </div>
@@ -570,17 +603,19 @@ const Viewer = () => {
           <div className="absolute top-4 right-4 flex flex-col space-y-2">
             <Button 
               onClick={resetView}
-              variant="viewer" 
+              variant="outline" 
               size="icon"
-              title="Frame model in view"
+              title="Centrar en origen (0,0,0)"
+              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
             >
               <Move className="h-5 w-5" />
             </Button>
             <Button 
               onClick={toggleFullscreen}
-              variant="viewer" 
+              variant="outline" 
               size="icon"
-              title="Toggle fullscreen"
+              title="Pantalla completa"
+              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
             >
               {isFullscreen ? <MinimizeIcon className="h-5 w-5" /> : <MaximizeIcon className="h-5 w-5" />}
             </Button>
@@ -596,9 +631,10 @@ const Viewer = () => {
                   viewerRef.current.context.ifcCamera.cameraControls.zoom(1.2);
                 }
               }}
-              variant="viewer" 
+              variant="outline" 
               size="icon"
-              title="Zoom in"
+              title="Aumentar zoom"
+              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
             >
               <ZoomIn className="h-5 w-5" />
             </Button>
@@ -608,7 +644,7 @@ const Viewer = () => {
       
       {/* Status bar */}
       <footer className="h-6 bg-[#333333] border-t border-[#444444] text-[#AAAAAA] text-xs px-4 flex items-center">
-        <span>Ready</span>
+        <span>Listo</span>
         <span className="ml-auto">{fileType?.toUpperCase()} Viewer</span>
       </footer>
     </div>
