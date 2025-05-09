@@ -11,9 +11,10 @@ import { IfcViewerAPI } from "web-ifc-viewer";
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;
   fileName: string | null;
+  fileUrl?: string; // Added fileUrl prop
 }
 
-const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
+const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
@@ -24,7 +25,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
 
   useEffect(() => {
     // Log info for debugging
-    console.log("ModelViewer received:", { fileType, fileName });
+    console.log("ModelViewer received:", { fileType, fileName, fileUrl });
     
     if (!fileType || !fileName) {
       toast({
@@ -222,7 +223,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
   }, [fileType, fileName, toast]);
 
   const handleViewIn3D = () => {
-    navigate('/viewer', { state: { fileType, fileName } });
+    navigate('/viewer', { state: { fileType, fileName, fileUrl } });
   };
 
   return (

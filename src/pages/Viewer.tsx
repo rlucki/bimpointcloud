@@ -45,6 +45,7 @@ const Viewer = () => {
   const fileType = state.fileType;
   const fileName = state.fileName;
   const fileSize = state.fileSize;
+  const fileUrl = state.fileUrl; // Add support for fileUrl
 
   // If no state, redirect to the main page
   useEffect(() => {
@@ -56,7 +57,7 @@ const Viewer = () => {
       });
       navigate('/');
     } else {
-      console.log("Viewer received:", { fileType, fileName, fileSize });
+      console.log("Viewer received:", { fileType, fileName, fileSize, fileUrl });
       
       // Simulate loading
       const timer = setTimeout(() => {
@@ -99,19 +100,60 @@ const Viewer = () => {
         const axesHelper = new THREE.AxesHelper(5);
         viewer.context.getScene().add(axesHelper);
         
-        // Add a sample model at origin (0,0,0)
-        const geometry = new THREE.BoxGeometry(3, 3, 3);
-        const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.set(0, 1.5, 0);
-        viewer.context.getScene().add(cube);
+        // Check if there's a file URL to load
+        if (fileUrl) {
+          try {
+            console.log("Loading IFC file from URL:", fileUrl);
+            
+            // Load the actual IFC model
+            const model = await viewer.IFC.loadIfcUrl(fileUrl);
+            
+            // Center and adjust camera to the loaded model
+            viewer.shadowDropper.renderShadow(model.modelID);
+            
+            // Fit the model in the view
+            const ifcProject = await viewer.IFC.getSpatialStructure(model.modelID);
+            
+            // Center view on the model
+            setTimeout(() => {
+              viewer.context.ifcCamera.cameraControls.fitToSphere(false, 1.5);
+              toast({
+                title: "IFC Model Loaded",
+                description: `${fileName} loaded successfully`
+              });
+            }, 500);
+          } catch (e) {
+            console.error("Error loading IFC model:", e);
+            toast({
+              variant: "destructive",
+              title: "Model loading error",
+              description: "Could not load the IFC model. Using placeholder instead."
+            });
+            
+            // If loading fails, show a placeholder cube as fallback
+            const geometry = new THREE.BoxGeometry(3, 3, 3);
+            const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(0, 1.5, 0);
+            viewer.context.getScene().add(cube);
+          }
+        } else {
+          // No file URL, so we'll show a placeholder
+          console.log("No IFC file URL provided. Showing placeholder cube.");
+          toast({
+            variant: "info",
+            title: "Demo Mode",
+            description: "No IFC file provided. Showing placeholder model."
+          });
+          
+          const geometry = new THREE.BoxGeometry(3, 3, 3);
+          const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
+          const cube = new THREE.Mesh(geometry, material);
+          cube.position.set(0, 1.5, 0);
+          viewer.context.getScene().add(cube);
+        }
         
         setViewerInitialized(true);
-        
-        toast({
-          title: "Viewer Initialized",
-          description: "3D environment ready at origin (0,0,0)"
-        });
         
       } catch (e) {
         console.error("Error initializing IFC viewer:", e);
@@ -353,7 +395,7 @@ const Viewer = () => {
     if (fileType === 'ifc' && viewerRef.current) {
       // Reset IFC view to show the whole model
       try {
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(true, 1.5); // Fixed here: added second parameter
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(false, 1.5);
         toast({
           title: "View Reset",
           description: "IFC model centered in view"
