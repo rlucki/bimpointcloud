@@ -54,14 +54,41 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
             backgroundColor: new THREE.Color(0xf0f4ff)
           });
           
+          // Center the model at 0,0,0
+          viewer.context.getScene().position.set(0, 0, 0);
+          
+          // Set up camera
+          viewer.context.ifcCamera.cameraControls.setPosition(5, 5, 5);
+          viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+          
           setViewerInitialized(true);
           
+          // Add grid for better spatial reference
+          const grid = new THREE.GridHelper(50, 50);
+          viewer.context.getScene().add(grid);
+          
+          // Add axes helper
+          const axesHelper = new THREE.AxesHelper(5);
+          viewer.context.getScene().add(axesHelper);
+          
           // The next step would be to load an IFC file from a URL
-          // For demo purposes, we'll show a toast instead since we don't have the actual file URL
+          // For now, we'll show a message in the viewer
+          const geometry = new THREE.BoxGeometry(2, 2, 2);
+          const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
+          const cube = new THREE.Mesh(geometry, material);
+          cube.position.set(0, 1, 0);
+          viewer.context.getScene().add(cube);
+          
+          // Add a text label
+          const textDiv = document.createElement('div');
+          textDiv.className = 'absolute bottom-4 left-4 bg-white p-2 rounded text-sm';
+          textDiv.textContent = `Ready to load: ${fileName}`;
+          containerRef.current.appendChild(textDiv);
+          
           setLoadingModel(false);
           toast({
-            title: "IFC Viewer Initialized",
-            description: "Ready to load IFC models.",
+            title: "Viewer Initialized",
+            description: "3D environment ready",
           });
           
         } catch (e) {
@@ -98,7 +125,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
         if (canvas) {
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            // Mock rendering for LAS files
+            // Clear the canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Background gradient
@@ -108,24 +135,83 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw point cloud placeholder
+            // Grid for better spatial reference
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1;
+            
+            // Draw vertical grid lines
+            for (let x = 0; x <= canvas.width; x += 50) {
+              ctx.beginPath();
+              ctx.moveTo(x, 0);
+              ctx.lineTo(x, canvas.height);
+              ctx.stroke();
+            }
+            
+            // Draw horizontal grid lines
+            for (let y = 0; y <= canvas.height; y += 50) {
+              ctx.beginPath();
+              ctx.moveTo(0, y);
+              ctx.lineTo(canvas.width, y);
+              ctx.stroke();
+            }
+
+            // Draw coordinate axes
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
+            // X axis (red)
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + 100, centerY);
+            ctx.stroke();
+            
+            // Y axis (green)
+            ctx.strokeStyle = 'green';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX, centerY - 100);
+            ctx.stroke();
+            
+            // Z axis (blue)
+            ctx.strokeStyle = 'blue';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX - 50, centerY + 50);
+            ctx.stroke();
+            
+            // Draw point cloud placeholder centered at origin
             ctx.fillStyle = 'rgba(79, 70, 229, 0.5)';
+            const originX = canvas.width / 2;
+            const originY = canvas.height / 2;
+            
             for (let i = 0; i < 1000; i++) {
-              const x = centerX + (Math.random() - 0.5) * 300;
-              const y = centerY + (Math.random() - 0.5) * 300;
+              const x = originX + (Math.random() - 0.5) * 300;
+              const y = originY + (Math.random() - 0.5) * 300;
               ctx.beginPath();
               ctx.arc(x, y, 1.5, 0, Math.PI * 2);
               ctx.fill();
             }
             
-            // Add a label
+            // Add coordinate labels
             ctx.fillStyle = '#1e293b';
             ctx.font = '12px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText("LAS Point Cloud", centerX, centerY - 120);
+            
+            // X axis label
+            ctx.fillText("X", centerX + 110, centerY + 15);
+            
+            // Y axis label
+            ctx.fillText("Y", centerX - 15, centerY - 110);
+            
+            // Z axis label
+            ctx.fillText("Z", centerX - 60, centerY + 65);
+            
+            // Origin label
+            ctx.fillText("Origin (0,0,0)", centerX, centerY + 20);
+            
+            // Add a file info label
             ctx.fillText(`File: ${fileName}`, centerX, 40);
           }
         }
@@ -180,7 +266,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
         ) : fileType === 'ifc' ? (
           <div 
             ref={containerRef} 
-            className="w-full h-[600px]"
+            className="w-full h-[600px] relative"
             style={{ visibility: viewerInitialized ? 'visible' : 'hidden' }}
           >
             {/* IFC Viewer will be initialized here */}
