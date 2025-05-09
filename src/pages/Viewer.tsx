@@ -25,7 +25,7 @@ const Viewer = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Set default to false to hide the sidebar
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [viewerInitialized, setViewerInitialized] = useState(false);
@@ -114,9 +114,10 @@ const Viewer = () => {
             // Fit the model in the view
             const ifcProject = await viewer.IFC.getSpatialStructure(model.modelID);
             
-            // Center view on the model - Fixed: changed number to boolean for first parameter
+            // Center view on the model - Fix: using correct parameter types
             setTimeout(() => {
-              viewer.context.ifcCamera.cameraControls.fitToSphere(true, 1.5);
+              // Fix: Using undefined instead of boolean/number to use default values
+              viewer.context.ifcCamera.cameraControls.fitToSphere(undefined);
               toast({
                 title: "IFC Model Loaded",
                 description: `${fileName} loaded successfully`
@@ -141,8 +142,7 @@ const Viewer = () => {
           // No file URL, so we'll show a placeholder
           console.log("No IFC file URL provided. Showing placeholder cube.");
           toast({
-            // Fixed: changed "info" to "default"
-            variant: "default", 
+            variant: "default",
             title: "Demo Mode",
             description: "No IFC file provided. Showing placeholder model."
           });
@@ -396,8 +396,8 @@ const Viewer = () => {
     if (fileType === 'ifc' && viewerRef.current) {
       // Reset IFC view to show the whole model
       try {
-        // Fixed: changed number to boolean for first parameter
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(true, 1.5);
+        // Fix: Using undefined instead of boolean/number to use default values
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(undefined);
         toast({
           title: "View Reset",
           description: "IFC model centered in view"
@@ -432,37 +432,6 @@ const Viewer = () => {
       toggleFullscreen();
     }
   };
-  
-  const selectModelItem = (itemName: string) => {
-    setSelectedItem(selectedItem === itemName ? null : itemName);
-    
-    toast({
-      title: selectedItem === itemName ? "Item Deselected" : "Item Selected",
-      description: selectedItem === itemName ? "Item deselected" : `Selected: ${itemName}`,
-    });
-    
-    // Re-render with selection if it's LAS
-    if (fileType === 'las' && canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
-      if (ctx) {
-        renderLasVisualization(ctx, canvasRef.current.width, canvasRef.current.height);
-      }
-    }
-    // For IFC, we would highlight the selected component here
-  };
-  
-  // Clean up viewer on unmount
-  useEffect(() => {
-    return () => {
-      if (viewerRef.current) {
-        try {
-          viewerRef.current.dispose();
-        } catch (e) {
-          console.error("Error disposing viewer:", e);
-        }
-      }
-    };
-  }, []);
   
   // If loading, show loader
   if (isLoading) {
@@ -563,95 +532,7 @@ const Viewer = () => {
       
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Side Panel */}
-        {isSidebarOpen && (
-          <aside className="w-64 bg-[#2A2A2A] border-r border-[#444444] flex flex-col">
-            <div className="p-3 border-b border-[#444444]">
-              <h3 className="text-white text-sm font-medium">Model Structure</h3>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {fileType === 'ifc' ? (
-                <div>
-                  <div className="py-1 px-2 text-[#ABABAB] text-xs font-medium">BUILDING STRUCTURE</div>
-                  <ul className="text-[#CCCCCC] text-sm">
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ${selectedItem === 'Building' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Building')}
-                    >
-                      <ChevronRight className="h-3 w-3 mr-1" /> Building
-                    </li>
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Levels' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Levels')}
-                    >
-                      <ChevronRight className="h-3 w-3 mr-1" /> Levels
-                    </li>
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-4 ${selectedItem === 'Level 1' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Level 1')}
-                    >
-                      <span className="w-3 mr-1"></span> Level 1
-                    </li>
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-4 ${selectedItem === 'Level 2' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Level 2')}
-                    >
-                      <span className="w-3 mr-1"></span> Level 2
-                    </li>
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Elements' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Elements')}
-                    >
-                      <ChevronRight className="h-3 w-3 mr-1" /> Elements
-                    </li>
-                  </ul>
-                </div>
-              ) : (
-                <div>
-                  <div className="py-1 px-2 text-[#ABABAB] text-xs font-medium">POINT CLOUD STRUCTURE</div>
-                  <ul className="text-[#CCCCCC] text-sm">
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ${selectedItem === 'Full Cloud' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Full Cloud')}
-                    >
-                      <ChevronRight className="h-3 w-3 mr-1" /> Full Cloud
-                    </li>
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Sections' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Sections')}
-                    >
-                      <ChevronRight className="h-3 w-3 mr-1" /> Sections
-                    </li>
-                    <li 
-                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Classifications' ? 'bg-[#4f46e5] text-white' : ''}`}
-                      onClick={() => selectModelItem('Classifications')}
-                    >
-                      <ChevronRight className="h-3 w-3 mr-1" /> Classifications
-                    </li>
-                  </ul>
-                </div>
-              )}
-            </div>
-            <div className="p-2 border-t border-[#444444] space-y-2">
-              <Button variant="viewer" size="sm" className="w-full">
-                Properties
-              </Button>
-              <Button onClick={expandModel} variant="viewer" size="sm" className="w-full flex items-center gap-2">
-                <Square className="h-4 w-4" />
-                <span>View Fullscreen</span>
-              </Button>
-            </div>
-          </aside>
-        )}
-        
-        {/* Toggle Sidebar Button */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="absolute left-64 top-1/2 transform -translate-y-1/2 z-10 bg-[#333333] text-white p-1 rounded-r-md border border-l-0 border-[#444444]"
-          style={{ left: isSidebarOpen ? '16rem' : '0' }}
-        >
-          {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </button>
+        {/* The sidebar has been completely removed as requested */}
         
         {/* Main Viewer Area */}
         <main className="flex-1 relative">
@@ -679,7 +560,7 @@ const Viewer = () => {
                 <span className="text-xs bg-[#444444] px-2 py-1 rounded">{fileType?.toUpperCase()}</span>
               </div>
               <div className="text-xs text-gray-300 mt-1">
-                Position: Origin (0,0,0) {selectedItem ? `| Selected: ${selectedItem}` : ''}
+                Position: Origin (0,0,0)
               </div>
             </div>
           </div>
