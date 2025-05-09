@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
+import { Cube } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
 import FileItem, { FileItemProps } from "@/components/FileItem";
 
@@ -16,6 +18,7 @@ const FileUploader: React.FC = () => {
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleFilesSelected = (selectedFiles: File[]) => {
     const newFiles = selectedFiles.map((file) => ({
@@ -116,6 +119,26 @@ const FileUploader: React.FC = () => {
     setFiles((prevFiles) => prevFiles.filter((file) => file.status !== "success"));
   };
 
+  const viewIn3D = () => {
+    // Find the first successful file
+    const successFile = files.find((file) => file.status === "success");
+    
+    if (successFile) {
+      const fileExtension = successFile.name.split('.').pop()?.toLowerCase();
+      const fileType = fileExtension === 'ifc' ? 'ifc' : fileExtension === 'las' ? 'las' : null;
+      
+      navigate('/viewer', { state: { fileType, fileName: successFile.name } });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "No uploaded files",
+        description: "Please upload at least one file successfully before viewing.",
+      });
+    }
+  };
+
+  const hasSuccessfulFiles = files.some((file) => file.status === "success");
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
@@ -157,12 +180,24 @@ const FileUploader: React.FC = () => {
         <div className="text-sm text-muted-foreground">
           Supported formats: .ifc, .las
         </div>
-        <Button 
-          onClick={simulateUpload} 
-          disabled={isUploading || files.length === 0}
-        >
-          {isUploading ? "Uploading..." : "Upload Files"}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={simulateUpload} 
+            disabled={isUploading || files.length === 0}
+          >
+            {isUploading ? "Uploading..." : "Upload Files"}
+          </Button>
+          
+          {hasSuccessfulFiles && (
+            <Button 
+              onClick={viewIn3D} 
+              variant="outline"
+              className="flex items-center gap-1"
+            >
+              <Cube className="h-4 w-4" /> View in 3D
+            </Button>
+          )}
+        </div>
       </CardFooter>
     </Card>
   );
