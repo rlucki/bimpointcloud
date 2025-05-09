@@ -1,6 +1,8 @@
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ViewerDropArea from "./ViewerDropArea";
+import * as THREE from "three";
+import { IfcViewerAPI } from "web-ifc-viewer";
 
 interface IfcViewerContainerProps {
   containerRef: React.RefObject<HTMLDivElement>;

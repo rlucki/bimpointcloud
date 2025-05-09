@@ -29,6 +29,8 @@ import { handleFrameAll as utilsHandleFrameAll, debugViewer } from "@/components
 import ViewerSidebar from "@/components/viewer/ViewerSidebar";
 import ViewerControls from "@/components/viewer/ViewerControls";
 import ViewerLayout from "@/components/viewer/ViewerLayout";
+import IfcViewerContainer from "@/components/viewer/IfcViewerContainer";
+import ViewerDiagnostics from "@/components/viewer/ViewerDiagnostics";
 
 // Type definitions for the file data
 interface FileData {
@@ -51,6 +53,7 @@ const Viewer = () => {
   const [showStats, setShowStats] = useState(false);
   const [visibleFiles, setVisibleFiles] = useState<{[key: string]: boolean}>({});
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   
   // Extract files from location state
   const state = location.state || {};
@@ -135,6 +138,7 @@ const Viewer = () => {
         backgroundColor: new THREE.Color(0x222222)
       });
       
+      // Asignar viewer a la referencia
       viewerRef.current = viewer;
       
       // Set up camera
@@ -173,16 +177,27 @@ const Viewer = () => {
       cube.position.set(0, 0.3, 0);
       viewer.context.getScene().add(cube);
       
+      // IMPORTANTE: Configurar la ruta de WASM antes de cargar cualquier modelo
+      try {
+        await viewer.IFC.setWasmPath("/wasm/");
+        console.log("WASM path set for IFC parser");
+      } catch (wasmError) {
+        console.error("Error setting WASM path:", wasmError);
+        setLoadingError("Failed to set WebAssembly path. Check if WASM files are available in /wasm/ directory.");
+        toast({
+          variant: "destructive",
+          title: "WASM error",
+          description: "Could not load WebAssembly modules required for IFC parsing",
+        });
+        return;
+      }
+      
       // Load all IFC models
       for (const file of files.filter(f => f.fileType === 'ifc')) {
         try {
           console.log(`Loading IFC model: ${file.fileName} from URL: ${file.fileUrl}`);
           
           if (file.fileUrl) {
-            // IMPORTANT: Set the WebAssembly path first - crucial for the IFC parser
-            await viewer.IFC.setWasmPath("/wasm/");
-            console.log("WASM path set for IFC parser");
-            
             // Try loading the file
             const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
             
@@ -241,7 +256,6 @@ const Viewer = () => {
               description: `Successfully loaded ${file.fileName}`,
             });
           } else {
-            console.warn(`No URL provided for file: ${file.fileName}`);
             // Use example model if no URL is provided
             const exampleUrl = "https://examples.ifcjs.io/models/ifc/SametLibrary.ifc";
             console.log(`Using example IFC model from: ${exampleUrl}`);
@@ -252,10 +266,7 @@ const Viewer = () => {
             });
             
             try {
-              // IMPORTANT: Set the WebAssembly path first
-              await viewer.IFC.setWasmPath("/wasm/");
-              console.log("WASM path set for example model");
-              
+              // Try to load example model
               const model = await viewer.IFC.loadIfcUrl(exampleUrl);
               console.log("Example IFC model loaded successfully");
               
@@ -393,13 +404,33 @@ const Viewer = () => {
     frameAllRef.current = frameAll;
   }, []);
   
-  // Use the improved debug viewer utility
   const handleDebug = () => {
-    if (viewerRef.current) {
-      debugViewer(viewerRef, toast);
-    } else {
-      console.log("Viewer not initialized");
-      console.log("Files:", files);
+    // Mostrar el diálogo de diagnóstico
+    setShowDiagnostics(true);
+  };
+
+  const reloadViewer = () => {
+    // Recargar el visor IFC
+    const ifcFile = files.find(file => file.fileType === 'ifc');
+    if (ifcFile) {
+      // Limpiar referencias antes de reinicializar
+      if (viewerRef.current) {
+        try {
+          viewerRef.current.dispose();
+          viewerRef.current = null;
+        } catch (e) {
+          console.error("Error disposing viewer:", e);
+        }
+      }
+      
+      // Reinicializar
+      setTimeout(() => {
+        initializeIfcViewer(ifcFile);
+        toast({
+          title: "Viewer reloaded",
+          description: "IFC viewer has been reinitialized"
+        });
+      }, 500);
     }
   };
 
@@ -520,7 +551,7 @@ const Viewer = () => {
           </div>
         </div>
         
-        {/* Viewer Controls - now using the separate component */}
+        {/* Viewer Controls */}
         <ViewerControls
           onFrameAll={handleFrameAll}
           onToggleFullscreen={toggleFullscreen}
@@ -528,6 +559,19 @@ const Viewer = () => {
           isFullscreen={isFullscreen}
         />
       </div>
+      
+      {/* Modal de diagnósticos */}
+      {showDiagnostics && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <ViewerDiagnostics
+            viewer={viewerRef.current}
+            fileUrl={currentFileUrl}
+            fileName={currentFileName}
+            onClose={() => setShowDiagnostics(false)}
+            onReload={reloadViewer}
+          />
+        </div>
+      )}
       
       {/* Status bar */}
       <footer className="h-6 bg-[#333333] border-t border-[#444444] text-[#AAAAAA] text-xs px-4 flex items-center">

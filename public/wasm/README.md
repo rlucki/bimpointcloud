@@ -13,8 +13,8 @@ Archivos necesarios:
 
 Opción 1: Copiar desde node_modules:
 ```
-cp node_modules/web-ifc/*.wasm public/wasm/
-cp node_modules/web-ifc/*.worker.js public/wasm/
+cp node_modules/web-ifc/dist/*.wasm public/wasm/
+cp node_modules/web-ifc/dist/*.worker.js public/wasm/
 ```
 
 Opción 2: Descargar desde CDN:
@@ -24,3 +24,13 @@ Opción 2: Descargar desde CDN:
 - https://unpkg.com/web-ifc@0.0.x/dist/web-ifc-mt.worker.js
 
 Reemplaza x con el número de versión que coincida con tu dependencia web-ifc-viewer.
+
+## IMPORTANTE: Verificación de archivos
+
+Para verificar que los archivos están correctamente instalados, puedes usar la siguiente solicitud HTTP:
+
+```
+HEAD /wasm/web-ifc.wasm
+```
+
+Si recibes un estado 200, los archivos están disponibles. Si recibes un 404, necesitas instalar los archivos manualmente.
