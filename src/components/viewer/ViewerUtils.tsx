@@ -28,7 +28,7 @@ export const handleFrameAll = (viewerRef: React.MutableRefObject<IfcViewerAPI | 
           if (!boundingBox.isEmpty()) {
             // Create a sphere from the bounding box
             const boundingSphere = new THREE.Sphere();
-            // Fix: Pass a vector to store the result when calling getBoundingSphere
+            // Fix: Always pass a sphere object to getBoundingSphere
             boundingBox.getBoundingSphere(boundingSphere);
             
             // Create a dummy object at the center of the bounding sphere

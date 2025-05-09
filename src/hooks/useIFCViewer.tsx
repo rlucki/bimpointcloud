@@ -100,13 +100,19 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         modelRef.current = model;
         
         if (model && model.mesh) {
-          // Force computation of the bounding sphere if needed
-          if (model.mesh.geometry && !model.mesh.geometry.boundingSphere) {
-            model.mesh.geometry.computeBoundingSphere();
+          // Fix: Asegurarse de que el modelo tiene una geometría calculada antes de encuadrarlo
+          if (model.mesh.geometry) {
+            // Force computation of the bounding sphere if needed
+            if (!model.mesh.geometry.boundingSphere) {
+              model.mesh.geometry.computeBoundingSphere();
+            }
+            
+            // Frame the model using our improved utility function
+            await frameIFCModel(viewerRef, model.mesh);
+          } else {
+            // Si no hay geometría definida, utiliza el modelo completo para el encuadre
+            viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
           }
-          
-          // Frame the model using our improved utility function
-          await frameIFCModel(viewerRef, model.mesh);
         }
         
         setModelLoaded(true);
@@ -162,6 +168,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         } else {
           // Otherwise frame the whole scene
           const scene = viewerRef.current.context.getScene();
+          // Fix: Siempre pasar la escena como argumento a fitToSphere
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         }
         console.log("Framed all objects");

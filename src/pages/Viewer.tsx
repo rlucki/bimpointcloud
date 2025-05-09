@@ -284,7 +284,7 @@ const Viewer = () => {
         // Force scene update
         if (viewerRef.current) {
           viewerRef.current.context.getScene().updateMatrixWorld();
-          viewerRef.current.IFC.selector.update();
+          // Eliminamos la llamada al método update() que no existe en esta versión
         }
         
         console.log("Model visibility updated", { model, isVisible });
@@ -319,6 +319,7 @@ const Viewer = () => {
   // Add a reference for frame-all function
   const frameAllRef = useRef<() => void>(() => {});
 
+  // Fix: Remove the unused parameter to match expected function signature
   const handleFrameAll = () => {
     // Call the frame all function stored in ref
     frameAllRef.current();
