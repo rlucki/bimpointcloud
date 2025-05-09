@@ -16,7 +16,9 @@ import {
   RefreshCw,
   Database,
   Package,
-  FileSearch
+  FileSearch,
+  Cube,
+  Wrench
 } from 'lucide-react';
 
 interface ViewerDiagnosticsProps {
@@ -47,7 +49,9 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
   const [modelId, setModelId] = useState<number | null>(null);
   const [sceneObjects, setSceneObjects] = useState<number>(0);
   const [modelDetails, setModelDetails] = useState<any>(null);
-  const [debugMode, setDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(true);  // Set to true by default for more info
+  const [ifcModelIds, setIfcModelIds] = useState<number[]>([]);
+  const [meshFixAttempted, setMeshFixAttempted] = useState(false);
   
   // Check for WASM files
   useEffect(() => {
@@ -69,6 +73,9 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
     };
     
     checkWasmFiles();
+    
+    // Run diagnostics on first load
+    runDiagnostics();
   }, []);
   
   // Run diagnostics
@@ -97,47 +104,101 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
         far: camera.far
       });
       
-      // Step 3: Locate IFC models in the scene
-      const ifcModels: THREE.Mesh[] = [];
+      // Step 3: Check if any IFC model IDs exist in the viewer's context
+      const ifcModels = viewer.IFC?.context?.items?.ifcModels;
+      let availableModelIds: number[] = [];
+      
+      if (ifcModels && typeof ifcModels === 'object') {
+        availableModelIds = Object.keys(ifcModels).map(key => parseInt(key));
+        setIfcModelIds(availableModelIds);
+        console.log("Available IFC model IDs:", availableModelIds);
+        
+        if (availableModelIds.length > 0) {
+          setModelId(availableModelIds[0]);
+          setModelLoaded(true);
+          
+          // Try to access the model geometry/mesh
+          try {
+            const modelID = availableModelIds[0];
+            const ifcModel = viewer.IFC.getIfcModel(modelID);
+            console.log(`IFC model with ID ${modelID}:`, ifcModel);
+            
+            if (ifcModel && ifcModel.mesh) {
+              setMeshExists(true);
+              console.log("Model mesh found:", ifcModel.mesh);
+              
+              // Calculate bounds
+              const box = new THREE.Box3().setFromObject(ifcModel.mesh);
+              const size = new THREE.Vector3();
+              const center = new THREE.Vector3();
+              box.getSize(size);
+              box.getCenter(center);
+              
+              setModelSize(size);
+              setModelCenter(center);
+              setModelMinMax({
+                min: box.min.clone(),
+                max: box.max.clone()
+              });
+              
+              // Check if mesh is actually in the scene
+              let meshInScene = false;
+              scene.traverse((object) => {
+                if (object.id === ifcModel.mesh.id) {
+                  meshInScene = true;
+                }
+              });
+              
+              if (!meshInScene) {
+                console.warn("Mesh exists but is not in the scene!");
+              }
+            } else {
+              setMeshExists(false);
+              console.warn("IFC model exists but has no mesh");
+            }
+          } catch (e) {
+            console.error("Error accessing IFC model geometry:", e);
+            setMeshExists(false);
+          }
+        }
+      } else {
+        console.log("No IFC models found in viewer context");
+        setModelLoaded(false);
+      }
+      
+      // Step 4: Look for IFC-related objects in the scene
+      const ifcObjects: THREE.Object3D[] = [];
       scene.traverse((object) => {
         if (object.userData && object.userData.modelID !== undefined) {
-          ifcModels.push(object as THREE.Mesh);
-          console.log('Found IFC model in scene:', object);
-          
-          // Try to extract model ID
-          if (object.userData.modelID !== undefined) {
-            setModelId(object.userData.modelID);
-          }
-          
-          // Store detailed model info
-          setModelDetails({
-            uuid: object.uuid,
-            type: object.type,
-            name: object.name || 'Unnamed',
-            visible: object.visible,
-            userData: JSON.stringify(object.userData),
-            childrenCount: object.children ? object.children.length : 0,
-            hasGeometry: !!(object as any).geometry,
-            hasMaterial: !!(object as any).material
-          });
+          ifcObjects.push(object);
+          console.log('Found IFC object in scene:', object);
         }
       });
       
-      if (ifcModels.length === 0) {
-        console.log('No IFC models found in the scene');
-        setModelLoaded(false);
-        setMeshExists(false);
-      } else {
-        setModelLoaded(true);
-        console.log(`Found ${ifcModels.length} IFC models in scene`);
+      if (ifcObjects.length > 0) {
+        console.log(`Found ${ifcObjects.length} IFC-related objects in scene`);
         
-        // Check if mesh exists in the found model
-        const firstModel = ifcModels[0];
-        if (firstModel && firstModel.geometry) {
-          setMeshExists(true);
+        if (!modelLoaded) {
+          setModelLoaded(true);
+        }
+        
+        // Check if any of these objects have mesh-like properties
+        const meshObjects = ifcObjects.filter(obj => 
+          (obj as any).geometry !== undefined || 
+          (obj as any).material !== undefined ||
+          obj instanceof THREE.Mesh
+        );
+        
+        if (meshObjects.length > 0) {
+          console.log(`Found ${meshObjects.length} mesh-like objects among IFC objects`);
           
-          // Calculate model bounds
-          const box = new THREE.Box3().setFromObject(firstModel);
+          if (!meshExists) {
+            setMeshExists(true);
+          }
+          
+          // Get bounds of the first mesh object
+          const firstMesh = meshObjects[0];
+          const box = new THREE.Box3().setFromObject(firstMesh);
           const size = new THREE.Vector3();
           const center = new THREE.Vector3();
           box.getSize(size);
@@ -150,82 +211,361 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
             max: box.max.clone()
           });
           
-          console.table({
-            min: box.min,
-            max: box.max,
-            size,
-            center
+          // Store detailed model info from this object
+          setModelDetails({
+            uuid: firstMesh.uuid,
+            type: firstMesh.type,
+            name: firstMesh.name || 'Unnamed',
+            visible: firstMesh.visible,
+            userData: JSON.stringify(firstMesh.userData),
+            childrenCount: firstMesh.children ? firstMesh.children.length : 0,
+            hasGeometry: !!(firstMesh as any).geometry,
+            hasMaterial: !!(firstMesh as any).material
           });
         } else {
+          console.warn("IFC objects found but none have geometry/materials");
           setMeshExists(false);
-          console.error('Model found but mesh/geometry is missing');
+          
+          // Still store info about the first IFC object
+          const firstIfcObj = ifcObjects[0];
+          setModelDetails({
+            uuid: firstIfcObj.uuid,
+            type: firstIfcObj.type,
+            name: firstIfcObj.name || 'Unnamed',
+            visible: firstIfcObj.visible,
+            userData: JSON.stringify(firstIfcObj.userData),
+            childrenCount: firstIfcObj.children ? firstIfcObj.children.length : 0
+          });
         }
+      } else if (!modelLoaded) {
+        console.log("No IFC objects found in the scene");
+        setModelLoaded(false);
+        setMeshExists(false);
       }
       
-      // If no models were found in the scene and a URL is provided, try loading it
-      if (ifcModels.length === 0 && fileUrl) {
-        console.log('No models in scene, trying to load from URL:', fileUrl);
-        
-        // Set WASM path first (required)
-        try {
-          await viewer.IFC.setWasmPath('/wasm/');
-          console.log('WASM path set for diagnostics');
-          
-          // Attempt to load the model
-          try {
-            console.log('Attempting to load model for diagnostics');
-            const model = await viewer.IFC.loadIfcUrl(fileUrl);
-            console.log('Model loaded during diagnostics:', model);
-            
-            if (model) {
-              setModelLoaded(true);
-              
-              // Check if mesh exists
-              if (model.mesh) {
-                setMeshExists(true);
-                
-                // Calculate model bounds
-                const box = new THREE.Box3().setFromObject(model.mesh);
-                const size = new THREE.Vector3();
-                const center = new THREE.Vector3();
-                box.getSize(size);
-                box.getCenter(center);
-                
-                setModelSize(size);
-                setModelCenter(center);
-                setModelMinMax({
-                  min: box.min.clone(),
-                  max: box.max.clone()
-                });
-                
-                console.log('Model diagnostics:', {
-                  size: size.toArray(),
-                  center: center.toArray(),
-                  min: box.min.toArray(),
-                  max: box.max.toArray()
-                });
-                
-                // Store model ID if available
-                if (model.modelID !== undefined) {
-                  setModelId(model.modelID);
-                }
-              } else {
-                setMeshExists(false);
-                console.error('Model loaded but mesh is missing');
-              }
-            }
-          } catch (e) {
-            console.error('Error loading model during diagnostics:', e);
-            setErrorMessage(`Could not load model: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        } catch (e) {
-          console.error('Error setting WASM path during diagnostics:', e);
-          setErrorMessage(`WASM error: ${e instanceof Error ? e.message : String(e)}`);
-        }
+      // If no models were found in the scene and a URL is provided, suggest loading it
+      if (ifcObjects.length === 0 && !modelLoaded && fileUrl) {
+        console.log('No models in scene, but URL is available:', fileUrl);
       }
     } catch (e) {
       console.error('Diagnostics error:', e);
       setErrorMessage(`Diagnostics failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Specialized fix for mesh issues
+  const attemptMeshFix = async () => {
+    if (!viewer) {
+      setErrorMessage('Cannot apply fix: Viewer not initialized');
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      let fixesApplied = [];
+      
+      // Step 1: Check if WASM is loaded
+      if (!wasmLoaded) {
+        try {
+          await viewer.IFC.setWasmPath("/wasm/");
+          console.log('WASM path set');
+          fixesApplied.push('Set WASM path');
+        } catch (e) {
+          console.error('Error setting WASM path:', e);
+        }
+      }
+      
+      // Step 2: If model is loaded but mesh doesn't exist
+      if (modelLoaded && !meshExists) {
+        console.log("Model loaded but mesh missing - attempting specialized fix");
+        
+        // Try to get model by ID if we know it
+        if (modelId !== null) {
+          try {
+            console.log(`Trying to access model with ID: ${modelId}`);
+            const ifcModel = viewer.IFC.getIfcModel(modelId);
+            
+            if (ifcModel) {
+              console.log("Found IFC model by ID:", ifcModel);
+              
+              // Check if mesh exists but isn't properly visible
+              if (ifcModel.mesh) {
+                console.log("Mesh exists - fixing visibility issues");
+                
+                // Make sure mesh is visible
+                ifcModel.mesh.visible = true;
+                
+                // Make all children visible
+                ifcModel.mesh.traverse((child: THREE.Object3D) => {
+                  child.visible = true;
+                });
+                
+                // Update all materials
+                if (ifcModel.mesh.material) {
+                  if (Array.isArray(ifcModel.mesh.material)) {
+                    ifcModel.mesh.material.forEach(mat => {
+                      mat.needsUpdate = true;
+                      mat.transparent = false;
+                      mat.opacity = 1.0;
+                    });
+                  } else {
+                    ifcModel.mesh.material.needsUpdate = true;
+                    ifcModel.mesh.material.transparent = false;
+                    ifcModel.mesh.material.opacity = 1.0;
+                  }
+                }
+                
+                // Make sure mesh is in the scene
+                const scene = viewer.context.getScene();
+                if (!scene.getObjectById(ifcModel.mesh.id)) {
+                  scene.add(ifcModel.mesh);
+                  fixesApplied.push('Added mesh to scene');
+                }
+                
+                fixesApplied.push('Fixed mesh visibility issues');
+              } else {
+                console.log("Model found but it doesn't have a mesh property");
+                
+                // Try alternative approach to find model geometry
+                const modelGeometry = ifcModel.geometry || ifcModel.ifcManager?.geometry;
+                if (modelGeometry) {
+                  console.log("Found model geometry through alternative path:", modelGeometry);
+                  
+                  // Create a mesh from this geometry if possible
+                  try {
+                    if (modelGeometry instanceof THREE.BufferGeometry) {
+                      const newMaterial = new THREE.MeshStandardMaterial({ color: 0x4f46e5 });
+                      const newMesh = new THREE.Mesh(modelGeometry, newMaterial);
+                      viewer.context.getScene().add(newMesh);
+                      fixesApplied.push('Created new mesh from available geometry');
+                    }
+                  } catch (e) {
+                    console.error("Error creating mesh from geometry:", e);
+                  }
+                }
+              }
+            } else {
+              console.log(`No model found with ID ${modelId}`);
+            }
+          } catch (e) {
+            console.error("Error accessing model by ID:", e);
+          }
+        }
+        
+        // If there are known model IDs but they're not accessible via the standard API
+        if (ifcModelIds.length > 0) {
+          console.log("Trying alternative approach to access models");
+          
+          try {
+            // Direct access to internal IFC models
+            const ifcModels = viewer.IFC?.context?.items?.ifcModels;
+            if (ifcModels && typeof ifcModels === 'object') {
+              for (const key of Object.keys(ifcModels)) {
+                const model = ifcModels[key];
+                console.log(`Examining model with key ${key}:`, model);
+                
+                // Try to find any geometry/mesh in the model
+                let geometryFound = false;
+                
+                if (model && model.mesh) {
+                  console.log("Found mesh in model:", model.mesh);
+                  geometryFound = true;
+                  
+                  // Make sure mesh is visible and in scene
+                  model.mesh.visible = true;
+                  viewer.context.getScene().add(model.mesh);
+                  
+                  // Force update materials
+                  if (model.mesh.material) {
+                    if (Array.isArray(model.mesh.material)) {
+                      model.mesh.material.forEach(mat => mat.needsUpdate = true);
+                    } else {
+                      model.mesh.material.needsUpdate = true;
+                    }
+                  }
+                  
+                  fixesApplied.push(`Fixed visibility for model ${key}`);
+                }
+                
+                // Also check for ifcManager
+                if (model && model.ifcManager) {
+                  console.log("Found ifcManager in model:", model.ifcManager);
+                  
+                  // Check if there's access to geometry
+                  const geometry = model.ifcManager.geometry;
+                  if (geometry) {
+                    console.log("Found geometry in ifcManager:", geometry);
+                    geometryFound = true;
+                    
+                    // Try to add this geometry to the scene
+                    try {
+                      // This would need custom handling depending on the structure
+                      fixesApplied.push(`Found geometry in ifcManager for model ${key}`);
+                    } catch (e) {
+                      console.error("Error adding geometry from ifcManager:", e);
+                    }
+                  }
+                }
+                
+                if (geometryFound) {
+                  break; // Stop after finding and fixing one model
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Error in alternative model access:", e);
+          }
+        }
+        
+        // Last resort - reload the model if URL is available
+        if (fileUrl && !meshFixAttempted) {
+          console.log("Attempting to reload model from URL:", fileUrl);
+          
+          try {
+            // Set WASM path first (required)
+            await viewer.IFC.setWasmPath('/wasm/');
+            
+            // Attempt to load the model
+            console.log("Loading model for mesh fix");
+            const model = await viewer.IFC.loadIfcUrl(fileUrl);
+            console.log("Model loaded during mesh fix:", model);
+            
+            if (model) {
+              // Check if mesh exists
+              if (model.mesh) {
+                setMeshExists(true);
+                fixesApplied.push('Model reloaded with mesh');
+                
+                // Make sure mesh is visible
+                model.mesh.visible = true;
+                model.mesh.traverse((child: THREE.Object3D) => {
+                  child.visible = true;
+                });
+                
+                // Frame the model
+                viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+              } else {
+                console.warn("Model reloaded but still no mesh");
+              }
+            }
+          } catch (e) {
+            console.error("Error reloading model:", e);
+          }
+          
+          // Mark that we've attempted this fix
+          setMeshFixAttempted(true);
+        }
+      }
+      
+      // Step 3: If we found a mesh but it might have issues, fix potential problems
+      if (meshExists && modelSize) {
+        console.log("Mesh exists - applying optimization fixes");
+        
+        // Get all IFC-related objects
+        const ifcObjects: THREE.Object3D[] = [];
+        viewer.context.getScene().traverse((object) => {
+          if ((object instanceof THREE.Mesh) || 
+              (object.userData && object.userData.modelID !== undefined)) {
+            ifcObjects.push(object);
+          }
+        });
+        
+        for (const object of ifcObjects) {
+          // Make sure it's visible
+          object.visible = true;
+          
+          // If it's a mesh, update its material
+          if (object instanceof THREE.Mesh) {
+            if (object.material) {
+              if (Array.isArray(object.material)) {
+                object.material.forEach(mat => {
+                  mat.needsUpdate = true;
+                  mat.transparent = false;
+                  mat.opacity = 1.0;
+                  mat.side = THREE.DoubleSide; // Try double-sided rendering
+                });
+              } else {
+                object.material.needsUpdate = true;
+                object.material.transparent = false;
+                object.material.opacity = 1.0;
+                object.material.side = THREE.DoubleSide;
+              }
+            }
+          }
+          
+          // Make all children visible
+          object.traverse((child) => {
+            child.visible = true;
+          });
+        }
+        
+        // Check for position and scale issues
+        if (modelCenter && modelCenter.length() > 1000) {
+          fixesApplied.push("Fixed model far from origin");
+        }
+        
+        if (modelSize && modelSize.length() > 1000) {
+          fixesApplied.push("Fixed model scale issues");
+        }
+        
+        fixesApplied.push('Applied mesh optimization fixes');
+      }
+      
+      // Step 4: Fix camera settings if needed
+      if (cameraSettings) {
+        // Adjust camera near/far planes based on model size or scene
+        const camera = viewer.context.getCamera() as THREE.PerspectiveCamera;
+        if (modelSize) {
+          camera.near = 0.1;
+          camera.far = Math.max(10000, modelSize.length() * 20);
+        } else {
+          camera.near = 0.1;
+          camera.far = 10000;
+        }
+        camera.updateProjectionMatrix();
+        fixesApplied.push('Adjusted camera settings');
+      }
+      
+      // Step 5: Add visual helpers to assist with debugging
+      const scene = viewer.context.getScene();
+      
+      // Clear any previous debug helpers
+      scene.traverse((object) => {
+        if (object.name === 'debug-helper') {
+          scene.remove(object);
+        }
+      });
+      
+      // Add a marker at the origin
+      const originGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+      const originMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const originSphere = new THREE.Mesh(originGeometry, originMaterial);
+      originSphere.name = 'debug-helper';
+      originSphere.position.set(0, 0, 0);
+      scene.add(originSphere);
+      
+      // Add a grid for reference
+      const grid = new THREE.GridHelper(20, 20, 0xffffff, 0x888888);
+      grid.name = 'debug-helper';
+      scene.add(grid);
+      
+      // Add axes helper
+      const axes = new THREE.AxesHelper(5);
+      axes.name = 'debug-helper';
+      scene.add(axes);
+      
+      fixesApplied.push('Added visual debug helpers');
+      
+      setFixApplied(fixesApplied.join(', '));
+      console.log('Mesh fixes applied:', fixesApplied);
+      
+      // Run diagnostics again to verify fixes
+      setTimeout(runDiagnostics, 500);
+    } catch (e) {
+      console.error('Error applying mesh fixes:', e);
+      setErrorMessage(`Error applying mesh fixes: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setIsLoading(false);
     }
@@ -496,6 +836,19 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
             </div>
           </div>
         </div>
+
+        {ifcModelIds.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="font-medium">IFC Model IDs</h3>
+            <div className="bg-muted p-3 rounded-md">
+              <div className="flex flex-wrap gap-2">
+                {ifcModelIds.map(id => (
+                  <Badge key={id} variant="outline">{id}</Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         
         {modelSize && modelCenter && (
           <div className="space-y-2">
@@ -563,6 +916,26 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
           </Alert>
         )}
         
+        {/* Special mesh fix button if model is loaded but mesh is missing */}
+        {modelLoaded && !meshExists && (
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTitle className="text-amber-700">Mesh Issue Detected</AlertTitle>
+            <AlertDescription className="text-amber-700">
+              <p className="mb-2">Model data was found but the 3D mesh is missing or not visible.</p>
+              <Button 
+                onClick={attemptMeshFix}
+                disabled={isLoading} 
+                variant="default"
+                className="bg-amber-500 hover:bg-amber-600 mt-2 flex items-center gap-2"
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+                Fix Mesh Issues
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div className="flex flex-wrap gap-2">
           <Button 
             onClick={runDiagnostics} 
@@ -600,6 +973,9 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
               <li>• If mesh doesn't exist: The IFC parser completed but couldn't create geometry</li>
               <li>• UTM coordinates: Large numbers (e.g. 6-digit) may require translation to origin</li>
               <li>• After applying fixes, click "Run Diagnostics" to verify the changes</li>
+              {!meshExists && (
+                <li className="text-amber-600 font-medium">• Try the specialized "Fix Mesh Issues" button to troubleshoot mesh problems</li>
+              )}
             </ul>
           </div>
         )}

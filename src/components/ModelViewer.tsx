@@ -39,6 +39,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     error,
     isInitialized: viewerInitialized,
     modelLoaded,
+    meshExists,
     frameAll,
     debug
   } = useIFCViewer({
@@ -167,6 +168,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             viewerInitialized={viewerInitialized}
             isDragging={isDragging}
             modelLoaded={modelLoaded}
+            meshExists={meshExists}
             fileName={fileName}
             onOpenDiagnostics={openDiagnostics}
           />

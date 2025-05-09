@@ -2,7 +2,7 @@
 import React from "react";
 import ViewerDropArea from "./ViewerDropArea";
 import { Button } from "@/components/ui/button";
-import { Bug } from "lucide-react";
+import { Bug, AlertTriangle } from "lucide-react";
 
 interface IfcViewerContainerProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -11,6 +11,7 @@ interface IfcViewerContainerProps {
   modelLoaded: boolean;
   fileName: string | null;
   onOpenDiagnostics?: () => void;
+  meshExists?: boolean;
 }
 
 const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({ 
@@ -19,7 +20,8 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
   isDragging,
   modelLoaded,
   fileName,
-  onOpenDiagnostics
+  onOpenDiagnostics,
+  meshExists
 }) => {
   return (
     <div 
@@ -35,6 +37,11 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
           <div className="flex items-center">
             <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
             Model loaded: {fileName}
+            {meshExists === false && (
+              <span className="ml-2 flex items-center text-yellow-300">
+                <AlertTriangle className="h-3 w-3 mr-1" /> No mesh
+              </span>
+            )}
           </div>
         ) : (
           <div className="flex items-center">
@@ -45,7 +52,7 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
       </div>
       
       {/* Diagnostics shortcut button */}
-      {!modelLoaded && onOpenDiagnostics && viewerInitialized && (
+      {((!modelLoaded && onOpenDiagnostics && viewerInitialized) || (modelLoaded && meshExists === false)) && (
         <div className="absolute top-4 right-4">
           <Button 
             onClick={onOpenDiagnostics}
