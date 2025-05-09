@@ -16,6 +16,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [meshExists, setMeshExists] = useState(false);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
   const modelRef = useRef<any>(null);
   const { toast } = useToast();
@@ -59,11 +60,10 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         viewer.context.getScene().add(directionalLight);
         
         setIsInitialized(true);
-        setIsLoading(false);
         
         // Try to load model if URL is provided
         if (fileUrl) {
-          loadModel(viewer, fileUrl);
+          await loadModel(viewer, fileUrl);
         } else {
           // Add a demo cube if no model
           const geometry = new THREE.BoxGeometry(2, 2, 2);
@@ -103,8 +103,14 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         const model = await viewer.IFC.loadIfcUrl(url);
         console.log("IFC model loaded successfully:", model);
         
+        // Update model loaded state
+        setModelLoaded(true);
+        
         // Calculate model bounds and log them for debugging
         if (model && model.mesh) {
+          // Update mesh exists state
+          setMeshExists(true);
+          
           const box = new THREE.Box3().setFromObject(model.mesh);
           const size = new THREE.Vector3();
           const center = new THREE.Vector3();
@@ -135,6 +141,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
             box.getCenter(center);
             console.log("Model rescaled from mm to m");
           }
+        } else {
+          console.warn("Model loaded but mesh is not available");
         }
         
         modelRef.current = model;
@@ -144,7 +152,6 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           await frameIFCModel(viewerRef, model.mesh);
         }
         
-        setModelLoaded(true);
         setIsLoading(false);
         
         toast({
@@ -155,6 +162,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         console.error("Error loading IFC model:", e);
         setError("Failed to load IFC model. The file might be corrupted or in an unsupported format.");
         setIsLoading(false);
+        setModelLoaded(false);
+        setMeshExists(false);
         
         // Add a demo cube to show that the viewer is working
         const geometry = new THREE.BoxGeometry(2, 2, 2);
@@ -227,6 +236,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     isLoading,
     error,
     modelLoaded,
+    meshExists,
     frameAll,
     debug
   };
