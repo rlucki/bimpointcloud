@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { IfcViewerAPI } from 'web-ifc-viewer';
@@ -15,7 +14,7 @@ import {
   Loader2, 
   RefreshCw,
   Database,
-  Cube 
+  Package 
 } from 'lucide-react';
 
 interface ViewerDiagnosticsProps {
@@ -264,7 +263,7 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
             
             <div className="flex items-center justify-between bg-muted p-3 rounded-md">
               <div className="flex items-center gap-2">
-                <Cube className="h-4 w-4" />
+                <Package className="h-4 w-4" />
                 <span>Model loaded</span>
               </div>
               <div className="flex items-center">
@@ -275,7 +274,7 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
             
             <div className="flex items-center justify-between bg-muted p-3 rounded-md">
               <div className="flex items-center gap-2">
-                <Cube className="h-4 w-4" />
+                <Package className="h-4 w-4" />
                 <span>Mesh exists</span>
               </div>
               <div className="flex items-center">
