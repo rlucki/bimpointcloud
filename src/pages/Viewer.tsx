@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from "@/components/ui/menubar";
@@ -354,7 +353,7 @@ const Viewer = () => {
     if (fileType === 'ifc' && viewerRef.current) {
       // Reset IFC view to show the whole model
       try {
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(true);
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(true, 1.5); // Fixed here: added second parameter
         toast({
           title: "View Reset",
           description: "IFC model centered in view"
