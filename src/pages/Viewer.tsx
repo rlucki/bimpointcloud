@@ -271,7 +271,7 @@ const Viewer = () => {
     
     // Draw point cloud
     ctx.fillStyle = 'rgba(100, 149, 237, 0.7)';
-    const pointCount = 15000; // Increased point count for better visualization
+    const pointCount = 25000; // Increased point count for more densely populated visualization
     const spread = 300 * zoomLevel;
     
     // Generate pseudo-random points but in a stable pattern to simulate a real point cloud
@@ -280,28 +280,32 @@ const Viewer = () => {
       return (Math.sin(i * seed + offset) + 1) / 2;
     };
     
-    // Draw points in a disc-shaped pattern with varying densities
+    // Draw points in a more realistic point cloud pattern
     for (let i = 0; i < pointCount; i++) {
+      // Create a more realistic distribution of points
       const angle = pseudoRandom(i, 100) * Math.PI * 2;
-      const radius = pseudoRandom(i, 200) * (spread / 1.5);
+      const distFromCenter = Math.pow(pseudoRandom(i, 200), 0.5) * spread; // More points at the center
+      const heightVariation = (pseudoRandom(i, 300) - 0.5) * spread * 0.4; // Vertical variation
       
-      // X and Y coordinates in a disc pattern
-      const x = centerX + Math.cos(angle) * radius;
-      const y = centerY + Math.sin(angle) * radius;
+      // X and Y coordinates in a disc pattern with height variation 
+      const x = centerX + Math.cos(angle) * distFromCenter;
+      const y = centerY + Math.sin(angle) * distFromCenter + heightVariation;
       
-      // Size depends on distance from center to simulate depth
+      // Size and color depends on distance from center to simulate depth
       const distanceFromCenter = Math.sqrt(
         Math.pow((x - centerX) / zoomLevel, 2) + Math.pow((y - centerY) / zoomLevel, 2)
       );
       
-      // Color varies with distance
-      const intensity = Math.max(0, 1 - distanceFromCenter / (spread / zoomLevel));
-      const color = Math.floor(intensity * 255);
+      // Color varies with distance to create visual depth
+      const intensity = Math.max(0, 1 - distanceFromCenter / (spread / zoomLevel * 1.2));
+      const hue = 210; // Blue hue
+      const saturation = 80 + Math.floor(intensity * 20); // More saturated closer to center
+      const lightness = 50 + Math.floor((1-intensity) * 30); // Brighter in the distance
       
-      // Smaller points in the distance, larger in the foreground
-      const size = intensity * 2.5 * zoomLevel;
+      // Size varies with distance - slightly smaller in distance for better depth perception
+      const size = Math.max(0.8, 2 * zoomLevel * intensity);
       
-      ctx.fillStyle = `rgba(${color}, ${Math.min(200, color + 50)}, 255, ${intensity * 0.8})`;
+      ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${0.6 + intensity * 0.3})`;
       
       // Draw point
       ctx.beginPath();
@@ -313,7 +317,7 @@ const Viewer = () => {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.fillText(`${fileName} (${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size'})`, width / 2, 30);
     ctx.fillText("Point cloud centered at origin (0,0,0)", width / 2, 55);
-
+    
     // Highlight selected item if any
     if (selectedItem) {
       ctx.fillStyle = 'rgba(255, 255, 0, 0.2)';
@@ -589,7 +593,7 @@ const Viewer = () => {
               <Button variant="viewer" size="sm" className="w-full">
                 Properties
               </Button>
-              <Button onClick={expandModel} variant="viewer" size="sm" className="w-full flex items-center">
+              <Button onClick={expandModel} variant="viewer" size="sm" className="w-full flex items-center gap-2">
                 <Square className="h-4 w-4" />
                 <span>View Fullscreen</span>
               </Button>
