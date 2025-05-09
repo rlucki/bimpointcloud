@@ -1,3 +1,4 @@
+
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -93,6 +94,12 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     const loadModel = async (viewer: IfcViewerAPI, url: string) => {
       try {
         console.log("Loading IFC model from URL:", url);
+        
+        // IMPORTANT: Set the WebAssembly path before loading the model
+        // This is crucial for the IFC parser to work correctly
+        await viewer.IFC.setWasmPath("/wasm/");
+        console.log("WASM path set for IFC parser");
+        
         const model = await viewer.IFC.loadIfcUrl(url);
         console.log("IFC model loaded successfully:", model);
         
@@ -110,6 +117,24 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
             size,                       // length × height × width
             center                      // geometric center
           });
+          
+          // Check for extremely large coordinates (likely UTM or EPSG format)
+          if (box.min.length() > 100000 || box.max.length() > 100000) {
+            console.warn("Model has extremely large coordinates - likely in UTM or EPSG format");
+            // Center the model
+            model.mesh.position.sub(center);
+            console.log("Model recentered to origin");
+          }
+          
+          // Check for millimeter scale
+          if (size.length() > 10000) {
+            console.warn("Model appears to be in millimeters - scaling down by 0.001");
+            model.mesh.scale.setScalar(0.001);
+            // Recalculate box after scaling
+            box.setFromObject(model.mesh);
+            box.getCenter(center);
+            console.log("Model rescaled from mm to m");
+          }
         }
         
         modelRef.current = model;

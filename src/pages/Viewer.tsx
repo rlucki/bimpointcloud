@@ -1,3 +1,5 @@
+
+// Integrate the improved logic with the setWasmPath fix into the Viewer component
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
@@ -176,7 +178,11 @@ const Viewer = () => {
           console.log(`Loading IFC model: ${file.fileName} from URL: ${file.fileUrl}`);
           
           if (file.fileUrl) {
-            // Try loading the file - this might fail if URL is invalid or CORS issues
+            // IMPORTANT: Set the WebAssembly path first - crucial for the IFC parser
+            await viewer.IFC.setWasmPath("/wasm/");
+            console.log("WASM path set for IFC parser");
+            
+            // Try loading the file
             const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
             
             // Store reference to the model
@@ -186,13 +192,48 @@ const Viewer = () => {
             
             console.log("IFC model loaded successfully:", model);
             
-            // Fit to model after loading
-            setTimeout(() => {
-              if (viewer && model && model.mesh) {
-                // Fixed: Pass true as the second argument instead of an object
-                viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+            // Calculate model bounds and handle potential issues with position/scale
+            if (model && model.mesh) {
+              const box = new THREE.Box3().setFromObject(model.mesh);
+              const size = new THREE.Vector3();
+              const center = new THREE.Vector3();
+              box.getSize(size);
+              box.getCenter(center);
+              
+              console.table({
+                min: box.min,        // minimum coordinate
+                max: box.max,        // maximum coordinate
+                size,                // length × height × width
+                center               // geometric center
+              });
+              
+              // Handle extremely large coordinates (UTM/EPSG format)
+              if (box.min.length() > 100000 || box.max.length() > 100000) {
+                console.warn("Model has extremely large coordinates - recentering");
+                model.mesh.position.sub(center); // Recenter the model
               }
-            }, 500);
+              
+              // Handle models in millimeters
+              if (size.length() > 10000) {
+                console.warn("Model appears to be in millimeters - scaling down");
+                model.mesh.scale.setScalar(0.001); // Convert mm to m
+              }
+              
+              // Adjust camera planes for the scene scale
+              const camera = viewer.context.getCamera() as THREE.PerspectiveCamera;
+              camera.near = 0.1;
+              camera.far = Math.max(10000, size.length() * 20);
+              camera.updateProjectionMatrix();
+              console.log("Camera near/far adjusted:", {near: camera.near, far: camera.far});
+              
+              // Frame the model for proper viewing
+              setTimeout(() => {
+                if (viewer && model && model.mesh) {
+                  viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+                }
+              }, 500);
+            }
             
             toast({
               title: "Model loaded",
@@ -210,16 +251,30 @@ const Viewer = () => {
             });
             
             try {
+              // IMPORTANT: Set the WebAssembly path first
+              await viewer.IFC.setWasmPath("/wasm/");
+              console.log("WASM path set for example model");
+              
               const model = await viewer.IFC.loadIfcUrl(exampleUrl);
               console.log("Example IFC model loaded successfully");
               
-              // Fit to model after loading
-              setTimeout(() => {
-                if (model && model.mesh) {
-                  // Fixed: Pass true as the second argument instead of an object
-                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+              // Handle model positioning and framing
+              if (model && model.mesh) {
+                const box = new THREE.Box3().setFromObject(model.mesh);
+                const center = new THREE.Vector3();
+                box.getCenter(center);
+                
+                // Recenter if needed
+                if (center.length() > 100) {
+                  model.mesh.position.sub(center);
                 }
-              }, 500);
+                
+                // Fit to model
+                setTimeout(() => {
+                  viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+                }, 500);
+              }
             } catch (e) {
               console.error("Error loading example model:", e);
               setLoadingError("Could not load example model. Check network connection.");

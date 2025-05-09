@@ -107,19 +107,28 @@ export const frameIFCModel = async (
     // Check for extremely large coordinates (likely UTM or EPSG format)
     if (box.min.length() > 100000 || box.max.length() > 100000) {
       console.warn("Model has extremely large coordinates - likely in UTM or EPSG format");
+      
+      // Recenter model by subtracting the center
+      modelMesh.position.sub(center);
+      console.log("Model recentered to origin");
+      
+      // Recalculate bounding box after centering
+      box.setFromObject(modelMesh);
+      box.getCenter(center);
     }
     
     // Check for millimeter scale
     if (size.length() > 10000) {
-      console.warn("Model appears to be in millimeters - consider scaling down by 0.001");
-      // Optional auto-scaling (uncomment if needed)
-      // modelMesh.scale.setScalar(0.001);
-      // box.setFromObject(modelMesh);
-      // box.getCenter(center);
+      console.warn("Model appears to be in millimeters - scaling down");
+      // Auto-scaling to convert from mm to m
+      modelMesh.scale.setScalar(0.001);
+      console.log("Model rescaled from mm to m");
+      
+      // Recalculate box after scaling
+      box.setFromObject(modelMesh);
+      box.getSize(size);
+      box.getCenter(center);
     }
-    
-    // Recenter the model - move it so its center is at the origin
-    modelMesh.position.sub(center);
     
     // Make sure model is in the scene
     const scene = viewerRef.current.context.getScene();
@@ -131,13 +140,14 @@ export const frameIFCModel = async (
     viewerRef.current.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
     viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(modelMesh, true);
     
-    // Adjust camera near/far planes if needed
+    // Adjust camera near/far planes to ensure model is visible
     const camera = viewerRef.current.context.getCamera() as THREE.PerspectiveCamera;
     if (camera) {
-      // Ensure reasonable near/far values
+      // Ensure reasonable near/far values with wide enough range
       camera.near = 0.1;
-      camera.far = Math.max(1000, size.length() * 10);
+      camera.far = Math.max(10000, size.length() * 20); // Much larger far plane to handle large models
       camera.updateProjectionMatrix();
+      console.log("Camera near/far adjusted:", {near: camera.near, far: camera.far});
     }
     
     console.log("IFC model framed with proper centering", {
