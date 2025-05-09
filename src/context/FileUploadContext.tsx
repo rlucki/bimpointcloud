@@ -33,20 +33,14 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     if (files.length > 0) {
       console.log("Current files:", files);
-      files.forEach(file => {
-        console.log(`File: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
-      });
     }
   }, [files]);
 
   const handleFilesSelected = (selectedFiles: File[]) => {
     // Debug logs for selected files
     console.log("Selected files:", selectedFiles);
-    selectedFiles.forEach(file => {
-      console.log(`Selected file: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
-    });
     
-    // Filter only IFC and LAS files
+    // Create a deep copy of each file object to ensure all properties are preserved
     const validFiles = selectedFiles.filter(file => {
       const extension = file.name.split('.').pop()?.toLowerCase();
       if (extension === 'ifc' || extension === 'las') {
@@ -62,12 +56,20 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     // Create file objects with additional properties
     const newFiles = validFiles.map((file) => {
-      // Ensure we've captured all file properties correctly
+      // Create a properly structured file object with explicit properties
       const fileWithStatus = {
         ...file,
         id: `${file.name}-${Date.now()}`,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
         progress: 0,
         status: "idle" as const,
+        slice: file.slice,
+        stream: file.stream,
+        text: file.text,
+        arrayBuffer: file.arrayBuffer,
       };
       
       // Debug log for the created file object
@@ -147,18 +149,6 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         title: "Upload complete",
         description: `Successfully uploaded ${successCount} of ${files.length} files.`,
       });
-
-      // Automatically navigate to viewer after successful upload
-      const successFile = files.find((file) => file.status === "success");
-      if (successFile) {
-        const fileExtension = successFile.name.split('.').pop()?.toLowerCase();
-        const fileType = fileExtension === 'ifc' ? 'ifc' : 'las';
-        
-        // Log for debugging
-        console.log("Auto-navigating to viewer with:", { fileType, fileName: successFile.name });
-        
-        navigate('/viewer', { state: { fileType, fileName: successFile.name } });
-      }
     }
     
     setIsUploading(false);
@@ -183,10 +173,16 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       
       // Log information for debugging
-      console.log("Navigating to viewer with:", { fileType, fileName: successFile.name });
+      console.log("Navigating to viewer with:", { fileType, fileName: successFile.name, fileSize: successFile.size });
       
       if (fileType) {
-        navigate('/viewer', { state: { fileType, fileName: successFile.name } });
+        navigate('/viewer', { 
+          state: { 
+            fileType, 
+            fileName: successFile.name,
+            fileSize: successFile.size 
+          }
+        });
       } else {
         toast({
           variant: "destructive",
@@ -200,10 +196,6 @@ export const FileUploadProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         title: "No uploaded files",
         description: "Please upload at least one file successfully before viewing.",
       });
-      
-      // Log debugging info about current files
-      console.log("Current files:", files);
-      console.log("Successful files:", files.filter(f => f.status === "success"));
     }
   };
 

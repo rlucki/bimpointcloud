@@ -23,8 +23,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
     console.log("Validating files:", files);
     
     const validatedFiles = Array.from(files).filter((file) => {
-      if (!file.name || !file.size) {
-        console.log("Invalid file - missing name or size:", file);
+      if (!file.name) {
+        console.log("Invalid file - missing name:", file);
         return false;
       }
       

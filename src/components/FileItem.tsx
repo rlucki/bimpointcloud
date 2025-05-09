@@ -26,8 +26,9 @@ const FileItem: React.FC<FileItemProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
   
-  // Add a safety check to ensure file and file.name exist before using split
-  const fileExtension = file && file.name ? file.name.split(".").pop()?.toLowerCase() : '';
+  // Ensure we have the file's name and extension
+  const fileName = file?.name || "Unknown file";
+  const fileExtension = fileName.split(".").pop()?.toLowerCase() || '';
   
   const getFileIcon = () => {
     switch (fileExtension) {
@@ -54,8 +55,8 @@ const FileItem: React.FC<FileItemProps> = ({
   };
   
   // Calculate actual file name and size
-  const displayName = file?.name || "Unknown file";
-  const displaySize = file?.size ? formatFileSize(file.size) : "0 KB";
+  const displayName = fileName;
+  const displaySize = file?.size ? formatFileSize(file.size) : "Unknown size";
   
   return (
     <div className={cn(
