@@ -50,7 +50,7 @@ const Viewer = () => {
 
   // If no state, redirect to the main page
   useEffect(() => {
-    if (!fileType || !fileName) {
+    if (!fileType && !fileName) {
       toast({
         variant: "destructive",
         title: "No file selected",
@@ -93,21 +93,84 @@ const Viewer = () => {
         viewer.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
         viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
         
-        // Mejorar la cuadrícula para que sea más visible
+        // Create a much more visible grid
         const gridSize = 100;
-        const gridDivisions = 100;
-        const gridColor = 0x888888;
-        const gridColorCenterLines = 0xffffff;
+        const gridDivisions = 20;
+        const gridColor = 0x666666;
+        const gridColorCenterLines = 0xFFFFFF;
         
-        // Crear una cuadrícula más grande y visible
+        // Create a larger and more visible grid
         const grid = new THREE.GridHelper(gridSize, gridDivisions, gridColorCenterLines, gridColor);
-        grid.position.set(0, 0, 0); // Asegurar que está en el origen
+        grid.material.opacity = 0.8;
+        grid.material.transparent = true;
+        grid.position.set(0, 0, 0);
         viewer.context.getScene().add(grid);
         
-        // Añadir ejes de coordenadas más grandes y visibles
-        const axesHelper = new THREE.AxesHelper(15); // Tamaño aumentado para mejor visibilidad
-        axesHelper.position.set(0, 0.1, 0); // Ligeramente por encima de la cuadrícula para evitar z-fighting
+        // Add larger and more vibrant axes
+        const axesHelper = new THREE.AxesHelper(25);
+        axesHelper.position.set(0, 0.1, 0);
+        // Make axes lines thicker
+        const xAxis = axesHelper.geometry.attributes.position;
+        const colors = axesHelper.geometry.attributes.color;
+        
+        // Make x-axis red more vibrant
+        colors.setXYZ(0, 1.0, 0.2, 0.2); // Brighter red
+        colors.setXYZ(1, 1.0, 0.2, 0.2);
+        
+        // Make y-axis green more vibrant
+        colors.setXYZ(2, 0.2, 1.0, 0.2); // Brighter green
+        colors.setXYZ(3, 0.2, 1.0, 0.2);
+        
+        // Make z-axis blue more vibrant
+        colors.setXYZ(4, 0.2, 0.2, 1.0); // Brighter blue
+        colors.setXYZ(5, 0.2, 0.2, 1.0);
+        
+        colors.needsUpdate = true;
         viewer.context.getScene().add(axesHelper);
+        
+        // Add a reference cube at the origin
+        const cubeGeometry = new THREE.BoxGeometry(5, 5, 5);
+        const cubeMaterial = new THREE.MeshBasicMaterial({ 
+          color: 0x4f46e5,
+          wireframe: true,
+          wireframeLinewidth: 2,
+          opacity: 0.8,
+          transparent: true
+        });
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.position.set(0, 2.5, 0); // Place it at origin, slightly elevated
+        viewer.context.getScene().add(cube);
+        
+        // Add text marker for origin
+        const originMarker = document.createElement('div');
+        originMarker.className = 'absolute px-2 py-1 text-xs bg-white/20 text-white rounded pointer-events-none';
+        originMarker.textContent = 'Origin (0,0,0)';
+        containerRef.current.appendChild(originMarker);
+        
+        // Animate the reference cube to make it more noticeable
+        const animateReferenceCube = () => {
+          cube.rotation.y += 0.005;
+          cube.rotation.x += 0.002;
+          
+          // Position the origin marker in 3D space
+          if (containerRef.current && originMarker) {
+            const vector = new THREE.Vector3(0, 0, 0);
+            vector.project(viewer.context.getCamera());
+            
+            const widthHalf = containerRef.current.clientWidth / 2;
+            const heightHalf = containerRef.current.clientHeight / 2;
+            
+            const x = (vector.x * widthHalf) + widthHalf;
+            const y = - (vector.y * heightHalf) + heightHalf;
+            
+            originMarker.style.left = `${x}px`;
+            originMarker.style.top = `${y + 20}px`;
+          }
+          
+          requestAnimationFrame(animateReferenceCube);
+        };
+        
+        animateReferenceCube();
         
         // Check if there's a file URL to load
         if (fileUrl) {
@@ -123,7 +186,7 @@ const Viewer = () => {
             // Fit the model in the view
             const ifcProject = await viewer.IFC.getSpatialStructure(model.modelID);
             
-            // Center view on the model - Fix: providing both required parameters
+            // Center view on the model - providing both required parameters
             setTimeout(() => {
               // Start with a view of the origin to help user orient
               viewer.context.ifcCamera.cameraControls.setPosition(20, 20, 20);
@@ -146,36 +209,15 @@ const Viewer = () => {
               description: "No se pudo cargar el modelo IFC. Mostrando modelo de ejemplo."
             });
             
-            // If loading fails, show a placeholder cube at the origin
-            const geometry = new THREE.BoxGeometry(5, 5, 5);
-            const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
-            const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(0, 2.5, 0); // Colocado justo en el origen, elevado para que se vea sobre la cuadrícula
-            viewer.context.getScene().add(cube);
-            
-            // Reset camera to show the origin and cube
-            viewer.context.ifcCamera.cameraControls.setPosition(15, 15, 15);
-            viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+            // If loading fails, we already have the reference cube at the origin
           }
         } else {
-          // No file URL, so we'll show a placeholder
-          console.log("No IFC file URL provided. Showing placeholder cube.");
+          // No file URL, the reference cube is already added
           toast({
             variant: "default",
             title: "Modo Demo",
-            description: "No se proporcionó archivo IFC. Mostrando modelo de ejemplo."
+            description: "Cubo de referencia centrado en el origen (0,0,0)"
           });
-          
-          // Crear un cubo grande y colorido en el origen como referencia
-          const geometry = new THREE.BoxGeometry(5, 5, 5);
-          const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
-          const cube = new THREE.Mesh(geometry, material);
-          cube.position.set(0, 2.5, 0); // Elevado para que se vea sobre la cuadrícula
-          viewer.context.getScene().add(cube);
-          
-          // Reset camera to show the origin and cube
-          viewer.context.ifcCamera.cameraControls.setPosition(15, 15, 15);
-          viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
         }
         
         setViewerInitialized(true);
@@ -282,21 +324,21 @@ const Viewer = () => {
     const centerX = width / 2 + viewPosition.x * zoomLevel;
     const centerY = height / 2 + viewPosition.y * zoomLevel;
     
-    // Mejorar la visibilidad de la cuadrícula
-    ctx.strokeStyle = 'rgba(120, 120, 120, 0.6)';
+    // Make grid much more visible
+    ctx.strokeStyle = 'rgba(150, 150, 150, 0.8)';
     ctx.lineWidth = 1;
     
     const gridSize = 50 * zoomLevel;
     const gridExtent = 2000;
     
-    // Dibujar líneas de cuadrícula
+    // Draw grid lines
     for (let x = -gridExtent; x <= gridExtent; x += gridSize / zoomLevel) {
-      // Línea central más brillante (eje X)
+      // Center line brighter (X axis)
       if (Math.abs(x) < 1) {
-        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 50, 50, 1.0)'; // Bright red
+        ctx.lineWidth = 3;
       } else {
-        ctx.strokeStyle = 'rgba(120, 120, 120, 0.4)';
+        ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
         ctx.lineWidth = 1;
       }
       
@@ -307,12 +349,12 @@ const Viewer = () => {
     }
     
     for (let y = -gridExtent; y <= gridExtent; y += gridSize / zoomLevel) {
-      // Línea central más brillante (eje Y)
+      // Center line brighter (Y axis)
       if (Math.abs(y) < 1) {
-        ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(50, 255, 50, 1.0)'; // Bright green
+        ctx.lineWidth = 3;
       } else {
-        ctx.strokeStyle = 'rgba(120, 120, 120, 0.4)';
+        ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
         ctx.lineWidth = 1;
       }
       
@@ -322,16 +364,16 @@ const Viewer = () => {
       ctx.stroke();
     }
     
-    // Marcar el origen con un círculo para que sea más evidente
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    // Mark origin with a larger circle
+    ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 4 * zoomLevel, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, 6 * zoomLevel, 0, Math.PI * 2);
     ctx.fill();
     
     // Draw axes with increased size and visibility
     // X axis (red)
     ctx.strokeStyle = '#ff3333';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
     ctx.lineTo(centerX + 150 * zoomLevel, centerY);
@@ -339,7 +381,7 @@ const Viewer = () => {
     
     // Y axis (green)
     ctx.strokeStyle = '#33ff33';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
     ctx.lineTo(centerX, centerY - 150 * zoomLevel);
@@ -347,23 +389,70 @@ const Viewer = () => {
     
     // Z axis (blue)
     ctx.strokeStyle = '#3333ff';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
     ctx.lineTo(centerX - 75 * zoomLevel, centerY + 75 * zoomLevel);
     ctx.stroke();
     
-    // Etiquetar los ejes con texto más grande y visible
+    // Label the axes with larger and more visible text
     ctx.fillStyle = '#ffffff';
-    ctx.font = '18px sans-serif';
+    ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText("X", centerX + 160 * zoomLevel, centerY + 20);
     ctx.fillText("Y", centerX - 20, centerY - 160 * zoomLevel);
     ctx.fillText("Z", centerX - 85 * zoomLevel, centerY + 95 * zoomLevel);
     
-    // Marcar el origen de manera más visible
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText("Origen (0,0,0)", centerX, centerY + 30);
+    // Mark the origin more visibly
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText("Origen (0,0,0)", centerX, centerY + 35);
+    
+    // Add a reference cube to the visualization
+    const cubeSize = 40 * zoomLevel;
+    const halfCubeSize = cubeSize / 2;
+    
+    // Cube center at origin
+    ctx.strokeStyle = '#4f46e5';
+    ctx.lineWidth = 2 * zoomLevel;
+    
+    // Front face
+    ctx.beginPath();
+    ctx.moveTo(centerX - halfCubeSize, centerY - halfCubeSize);
+    ctx.lineTo(centerX + halfCubeSize, centerY - halfCubeSize);
+    ctx.lineTo(centerX + halfCubeSize, centerY + halfCubeSize);
+    ctx.lineTo(centerX - halfCubeSize, centerY + halfCubeSize);
+    ctx.lineTo(centerX - halfCubeSize, centerY - halfCubeSize);
+    ctx.stroke();
+    
+    // Back face
+    ctx.beginPath();
+    ctx.moveTo(centerX - halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
+    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
+    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
+    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
+    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
+    ctx.stroke();
+    
+    // Connecting edges
+    ctx.beginPath();
+    ctx.moveTo(centerX - halfCubeSize, centerY - halfCubeSize);
+    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX + halfCubeSize, centerY - halfCubeSize);
+    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY - halfCubeSize - 15 * zoomLevel);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX + halfCubeSize, centerY + halfCubeSize);
+    ctx.lineTo(centerX + halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX - halfCubeSize, centerY + halfCubeSize);
+    ctx.lineTo(centerX - halfCubeSize + 15 * zoomLevel, centerY + halfCubeSize - 15 * zoomLevel);
+    ctx.stroke();
     
     // Draw point cloud
     ctx.fillStyle = 'rgba(100, 149, 237, 0.7)';
