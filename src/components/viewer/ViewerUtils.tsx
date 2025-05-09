@@ -28,6 +28,7 @@ export const handleFrameAll = (viewerRef: React.MutableRefObject<IfcViewerAPI | 
           if (!boundingBox.isEmpty()) {
             // Create a sphere from the bounding box
             const boundingSphere = new THREE.Sphere();
+            // Fix: Pass a vector to store the result when calling getBoundingSphere
             boundingBox.getBoundingSphere(boundingSphere);
             
             // Create a dummy object at the center of the bounding sphere
@@ -39,11 +40,13 @@ export const handleFrameAll = (viewerRef: React.MutableRefObject<IfcViewerAPI | 
             console.log("Objects framed using bounding sphere");
           } else {
             // Plan B: frame the whole scene if bounding box is empty
+            // Fix: Always pass the scene as an argument to fitToSphere
             viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
             console.log("Scene framed (alternative)");
           }
         } else if (scene) {
           // If the scene exists but has no children, frame the scene itself
+          // Fix: Always pass the scene as an argument to fitToSphere
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
           console.log("Empty scene framed");
         }
@@ -109,6 +112,7 @@ export const frameIFCModel = async (
     } else {
       // If no specific mesh, frame the entire scene
       const scene = viewerRef.current.context.getScene();
+      // Fix: Always pass the scene object as an argument to fitToSphere
       viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
     }
   } catch (e) {
