@@ -57,9 +57,12 @@ const ViewerLayout: React.FC<ViewerLayoutProps> = ({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[280px] sm:w-[350px] p-0">
-              {/* Fix: Remove onClose prop since it doesn't exist in ViewerSidebar */}
               <ViewerSidebar 
                 files={files}
+                selectedItem=""
+                visibleFiles={{}}
+                onSelectItem={() => {}}
+                onToggleVisibility={() => {}}
               />
             </SheetContent>
           </Sheet>
@@ -106,9 +109,12 @@ const ViewerLayout: React.FC<ViewerLayoutProps> = ({
         <main className="flex-1 flex flex-col overflow-hidden relative">
           {children}
           
-          {/* Fix: Remove className prop since it doesn't exist in ViewerToolbar */}
           <ViewerToolbar 
             onDebug={onDebug}
+            title=""
+            onClose={() => {}}
+            onToggleFullscreen={() => {}}
+            isFullscreen={false}
           />
         </main>
       </div>
