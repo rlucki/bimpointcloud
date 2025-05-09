@@ -1,9 +1,8 @@
 
 import React, { useMemo, useState } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Points, PointMaterial } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
+import { Points, PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import ViewerContainer from './ViewerContainer';
 
 interface PointCloudProps {
   url?: string;
@@ -105,11 +104,7 @@ const DemoPointCloud = ({ color = '#4f46e5', size = 0.03, opacity = 0.8 }: Omit<
 
 // Component for displaying point clouds
 const PointCloudViewer: React.FC<PointCloudProps> = ({ url, color = '#4f46e5', size = 0.03, opacity = 0.8 }) => {
-  return (
-    <div style={{ width: '100%', height: '100%' }}>
-      <DemoPointCloud color={color} size={size} opacity={opacity} />
-    </div>
-  );
+  return <DemoPointCloud color={color} size={size} opacity={opacity} />;
 };
 
 export default PointCloudViewer;

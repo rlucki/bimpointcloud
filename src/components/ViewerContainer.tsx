@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
-import { OrbitControls, Stats } from '@react-three/drei';
+import { OrbitControls, Stats, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface ViewerContainerProps {

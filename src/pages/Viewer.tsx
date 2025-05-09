@@ -333,16 +333,16 @@ const Viewer = () => {
             </div>
           ) : null}
           
-          {/* Overlay with instructions */}
-          <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded">
+          {/* Overlay with instructions - MOVED OUTSIDE Canvas */}
+          <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded pointer-events-none">
             <div className="flex items-center gap-2 text-sm">
               <Axis3d className="h-4 w-4" /> 
               <span>Origin (0,0,0) with X, Y, Z axes</span>
             </div>
           </div>
           
-          {/* File info overlay */}
-          <div className="absolute bottom-4 right-4">
+          {/* File info overlay - MOVED OUTSIDE Canvas */}
+          <div className="absolute bottom-4 right-4 pointer-events-none">
             <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
               <div className="flex items-center gap-2">
                 <File className="h-4 w-4" /> 
@@ -358,8 +358,8 @@ const Viewer = () => {
             </div>
           </div>
           
-          {/* Viewer Controls */}
-          <div className="absolute top-4 right-4 flex flex-col space-y-2">
+          {/* Viewer Controls - MOVED OUTSIDE Canvas */}
+          <div className="absolute top-4 right-4 flex flex-col space-y-2 pointer-events-auto">
             <Button 
               onClick={toggleFullscreen}
               variant="outline" 
