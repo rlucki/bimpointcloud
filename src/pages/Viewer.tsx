@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { 
@@ -23,6 +23,9 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import PointCloudViewer from "@/components/PointCloudViewer";
 import ViewerContainer, { HtmlOverlay } from "@/components/ViewerContainer";
+import { handleFrameAll, debugViewer } from "@/components/viewer/ViewerUtils";
+import ViewerSidebar from "@/components/viewer/ViewerSidebar";
+import ViewerControls from "@/components/viewer/ViewerControls";
 
 // Type definitions for the file data
 interface FileData {
@@ -243,6 +246,7 @@ const Viewer = () => {
     }
   };
 
+  // Updated function to properly toggle IFC model visibility
   const toggleFileVisibility = (fileId: string) => {
     // Update visibility state
     setVisibleFiles(prev => {
@@ -252,9 +256,38 @@ const Viewer = () => {
       const model = modelRefs.current[fileId];
       if (model) {
         const isVisible = newState[fileId];
+        console.log(`Setting visibility for model ${fileId} to ${isVisible}`);
+        
+        // Handle the entire model structure
         if (model.mesh) {
+          // Set visibility for the main mesh
           model.mesh.visible = isVisible;
+          
+          // Recursively set visibility for all children
+          if (model.mesh.children && model.mesh.children.length > 0) {
+            model.mesh.traverse((child: THREE.Object3D) => {
+              child.visible = isVisible;
+            });
+          }
         }
+        
+        // If the model has an ifcModel property, handle that too
+        if (model.ifcModel) {
+          model.ifcModel.visible = isVisible;
+        }
+        
+        // Additional handling for other possible model structures
+        if (model.geometry) {
+          model.visible = isVisible;
+        }
+        
+        // Force scene update
+        if (viewerRef.current) {
+          viewerRef.current.context.getScene().updateMatrixWorld();
+          viewerRef.current.IFC.selector.update();
+        }
+        
+        console.log("Model visibility updated", { model, isVisible });
       }
       
       return newState;
@@ -294,13 +327,7 @@ const Viewer = () => {
   const frameAll = () => {
     // If using IFC Viewer
     if (viewerRef.current) {
-      try {
-        // Fit the camera to the scene
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(viewerRef.current.context.getScene(), true);
-        console.log("Framed all objects in IFC viewer");
-      } catch (e) {
-        console.error("Error framing all objects in IFC viewer:", e);
-      }
+      handleFrameAll(viewerRef);
     }
   };
 
@@ -309,24 +336,10 @@ const Viewer = () => {
     frameAllRef.current = frameAll;
   }, []);
   
-  // Add debugging function
-  const debugViewer = () => {
+  // Use the improved debug viewer utility
+  const handleDebug = () => {
     if (viewerRef.current) {
-      console.log("IFC Viewer:", viewerRef.current);
-      console.log("Scene:", viewerRef.current.context.getScene());
-      console.log("Models:", modelRefs.current);
-      
-      // Add a sphere at origin to confirm rendering
-      const geometry = new THREE.SphereGeometry(0.3, 32, 32);
-      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-      const sphere = new THREE.Mesh(geometry, material);
-      sphere.position.set(0, 0, 0);
-      viewerRef.current.context.getScene().add(sphere);
-      
-      toast({
-        title: "Debug info",
-        description: "Check console for viewer information"
-      });
+      debugViewer(viewerRef, toast);
     } else {
       console.log("Viewer not initialized");
       console.log("Files:", files);
@@ -363,45 +376,13 @@ const Viewer = () => {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="bg-[#333333] border-r border-[#444444] text-white w-64 p-0">
-              <div className="p-4 border-b border-[#444444]">
-                <h2 className="text-lg font-medium">Files</h2>
-              </div>
-              <div className="p-4">
-                <h3 className="text-sm font-medium mb-2">LOADED FILES</h3>
-                <ul>
-                  {files.length > 0 ? (
-                    files.map((file) => (
-                      <li 
-                        key={file.id}
-                        className={`py-1 px-2 rounded cursor-pointer text-sm flex items-center justify-between ${selectedItem === file.fileName ? 'bg-[#444444]' : 'hover:bg-[#3a3a3a]'}`}
-                      >
-                        <div className="flex items-center" onClick={() => setSelectedItem(file.fileName)}>
-                          <File className="h-4 w-4 mr-2" /> 
-                          {file.fileName} <span className="ml-2 text-xs opacity-50">{file.fileType.toUpperCase()}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => file.id && toggleFileVisibility(file.id)}
-                        >
-                          {file.id && visibleFiles[file.id] ? (
-                            <Eye className="h-4 w-4" />
-                          ) : (
-                            <EyeOff className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="py-1 px-2 text-sm text-gray-400">
-                      Demo mode - no files loaded
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </SheetContent>
+            <ViewerSidebar 
+              files={files} 
+              selectedItem={selectedItem} 
+              visibleFiles={visibleFiles}
+              onSelectItem={setSelectedItem}
+              onToggleVisibility={toggleFileVisibility}
+            />
           </Sheet>
           
           <div className="ml-4 text-white font-medium">
@@ -413,7 +394,7 @@ const Viewer = () => {
         
         <div className="flex items-center space-x-1">
           {process.env.NODE_ENV === 'development' && (
-            <Button variant="ghost" size="icon" onClick={debugViewer} className="text-white hover:bg-[#444444]">
+            <Button variant="ghost" size="icon" onClick={handleDebug} className="text-white hover:bg-[#444444]">
               <Settings className="h-4 w-4" />
             </Button>
           )}
@@ -505,38 +486,13 @@ const Viewer = () => {
             </div>
           </div>
           
-          {/* Viewer Controls */}
-          <div className="absolute top-4 right-4 flex flex-col space-y-2 pointer-events-auto">
-            <Button 
-              onClick={frameAll}
-              variant="secondary" 
-              size="icon"
-              title="Frame all objects"
-              className="bg-[#333333] text-white hover:bg-[#444444] border border-[#444444]"
-            >
-              <Move className="h-5 w-5" />
-            </Button>
-            
-            <Button 
-              onClick={toggleFullscreen}
-              variant="secondary" 
-              size="icon"
-              title="Toggle fullscreen"
-              className="bg-[#333333] text-white hover:bg-[#444444] border border-[#444444]"
-            >
-              {isFullscreen ? <MinimizeIcon className="h-5 w-5" /> : <MaximizeIcon className="h-5 w-5" />}
-            </Button>
-            
-            <Button 
-              onClick={toggleStats}
-              variant="secondary" 
-              size="icon"
-              title="Toggle performance stats"
-              className="bg-[#333333] text-white hover:bg-[#444444] border border-[#444444]"
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
-          </div>
+          {/* Viewer Controls - now using the separate component */}
+          <ViewerControls
+            onFrameAll={handleFrameAll}
+            onToggleFullscreen={toggleFullscreen}
+            onToggleStats={toggleStats}
+            isFullscreen={isFullscreen}
+          />
         </main>
       </div>
       
