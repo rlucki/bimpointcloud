@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 interface UseIFCViewerProps {
   containerRef: React.RefObject<HTMLDivElement>;
   fileUrl?: string;
-  fileName?: string;
+  fileName?: string | null;
 }
 
 export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerProps) => {
@@ -97,12 +97,24 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         
         modelRef.current = model;
         
-        // Fit to model after loading
-        setTimeout(() => {
-          if (viewer && model && model.mesh) {
-            viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
-          }
-        }, 500);
+        // Mejor método de encuadre: Calcular bounding box del modelo
+        if (model && model.mesh) {
+          // 1) Calcular la caja envolvente del mesh
+          const bbox = new THREE.Box3().setFromObject(model.mesh);
+          
+          // 2) Extraer el centro y la esfera envolvente
+          const center = bbox.getCenter(new THREE.Vector3());
+          const sphere = bbox.getBoundingSphere(new THREE.Sphere());
+          
+          // 3) Encuadrar la cámara al centro y ajustarla para que quepa todo
+          viewer.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);
+          viewer.context.ifcCamera.cameraControls.fitToSphere(sphere, true);
+          
+          console.log("Modelo encuadrado usando bounding box:", {
+            center: center.toArray(),
+            radius: sphere.radius
+          });
+        }
         
         setModelLoaded(true);
         setIsLoading(false);
@@ -147,8 +159,14 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     if (viewerRef.current) {
       try {
         if (modelRef.current && modelRef.current.mesh) {
-          // If we have a model, frame it
-          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(modelRef.current.mesh, true);
+          // Si tenemos un modelo cargado, calculamos su bounding box
+          const bbox = new THREE.Box3().setFromObject(modelRef.current.mesh);
+          const center = bbox.getCenter(new THREE.Vector3());
+          const sphere = bbox.getBoundingSphere(new THREE.Sphere());
+          
+          // Encuadramos usando la esfera calculada
+          viewerRef.current.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);
+          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(sphere, true);
         } else {
           // Otherwise frame the whole scene
           const scene = viewerRef.current.context.getScene();
