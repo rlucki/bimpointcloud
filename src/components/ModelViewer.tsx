@@ -1,6 +1,5 @@
-
 import React, { useRef, useState } from "react";
-import * as THREE from "three";  // Added THREE import
+import * as THREE from "three";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -30,19 +29,20 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const [isDragging, setIsDragging] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Initializing...");
 
-  // Use our new custom hook for IFC viewer
+  // Use our custom hook for IFC viewer
   const {
     isLoading,
     error,
     isInitialized: viewerInitialized,
     modelLoaded,
+    meshExists,
     frameAll,
     debug
-  } = useIFCViewer({
+  } = useIFCViewer(
     containerRef,
-    fileUrl: fileType === 'ifc' ? fileUrl : undefined,
+    fileType === 'ifc' ? fileUrl : undefined,
     fileName
-  });
+  );
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();

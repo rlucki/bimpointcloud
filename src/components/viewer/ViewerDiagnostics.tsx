@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { IfcViewerAPI } from 'web-ifc-viewer';
 import { Button } from '@/components/ui/button';
