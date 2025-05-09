@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,6 +15,8 @@ import ViewerPlaceholder from "./viewer/ViewerPlaceholder";
 import ViewerError from "./viewer/ViewerError";
 import ViewerLoading from "./viewer/ViewerLoading";
 import ViewerCanvas from "./viewer/ViewerCanvas";
+import ViewerStatusBar from "./viewer/ViewerStatusBar";
+import { useIFCViewer } from "@/hooks/useIFCViewer";
 
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;
@@ -33,6 +36,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("Initializing...");
 
   useEffect(() => {
     // Log info for debugging
@@ -56,6 +60,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           if (!containerRef.current) return;
           
           console.log("Initializing IFC viewer...");
+          setStatusMessage("Initializing IFC viewer...");
           
           // Create the viewer
           viewer = new IfcViewerAPI({
@@ -71,6 +76,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
           
           setViewerInitialized(true);
+          setStatusMessage("Viewer initialized");
           
           // Add grid for better spatial reference
           const grid = new THREE.GridHelper(50, 50, 0xffffff, 0x888888);
@@ -92,8 +98,10 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           if (fileUrl) {
             try {
               console.log("Loading IFC model from URL:", fileUrl);
+              setStatusMessage("Loading model from URL...");
               const model = await viewer.IFC.loadIfcUrl(fileUrl);
               console.log("IFC model loaded successfully:", model);
+              setStatusMessage("Model loaded successfully");
               
               // Fit to model after loading - Fix: Ensure mesh is properly passed to fitToSphere
               setTimeout(() => {
@@ -112,6 +120,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             } catch (e) {
               console.error("Error loading IFC model:", e);
               setError("Failed to load IFC model. The file might be corrupted or in an unsupported format.");
+              setStatusMessage("Error loading model");
               
               // Add a demo cube to show that the viewer is working
               const geometry = new THREE.BoxGeometry(2, 2, 2);
@@ -145,6 +154,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           console.error("Error initializing IFC viewer:", e);
           setError("Failed to initialize IFC viewer. Please try again.");
           setLoadingModel(false);
+          setStatusMessage("Initialization error");
           toast({
             variant: "destructive",
             title: "Visualization error",
@@ -166,105 +176,11 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         }
       };
     } else if (fileType === 'las') {
-      // For LAS files, we'll continue to use the canvas fallback for now
+      // For LAS files, we'll continue to use the canvas fallback
+      setStatusMessage("Preparing LAS viewer...");
       const loadTimeout = setTimeout(() => {
         setLoadingModel(false);
-        
-        // Initialize canvas rendering for LAS
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            // Clear the canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Background gradient
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, '#222222');
-            gradient.addColorStop(1, '#333333');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Grid for better spatial reference
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = 1;
-            
-            // Draw vertical grid lines
-            for (let x = 0; x <= canvas.width; x += 50) {
-              ctx.beginPath();
-              ctx.moveTo(x, 0);
-              ctx.lineTo(x, canvas.height);
-              ctx.stroke();
-            }
-            
-            // Draw horizontal grid lines
-            for (let y = 0; y <= canvas.height; y += 50) {
-              ctx.beginPath();
-              ctx.moveTo(0, y);
-              ctx.lineTo(canvas.width, y);
-              ctx.stroke();
-            }
-
-            // Draw coordinate axes
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            
-            // X axis (red)
-            ctx.strokeStyle = 'red';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(centerX + 100, centerY);
-            ctx.stroke();
-            
-            // Y axis (green)
-            ctx.strokeStyle = 'green';
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(centerX, centerY - 100);
-            ctx.stroke();
-            
-            // Z axis (blue)
-            ctx.strokeStyle = 'blue';
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(centerX - 50, centerY + 50);
-            ctx.stroke();
-            
-            // Draw point cloud placeholder centered at origin
-            ctx.fillStyle = 'rgba(79, 70, 229, 0.5)';
-            const originX = canvas.width / 2;
-            const originY = canvas.height / 2;
-            
-            for (let i = 0; i < 1000; i++) {
-              const x = originX + (Math.random() - 0.5) * 300;
-              const y = originY + (Math.random() - 0.5) * 300;
-              ctx.beginPath();
-              ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-              ctx.fill();
-            }
-            
-            // Add coordinate labels
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '12px sans-serif';
-            ctx.textAlign = 'center';
-            
-            // X axis label
-            ctx.fillText("X", centerX + 110, centerY + 15);
-            
-            // Y axis label
-            ctx.fillText("Y", centerX - 15, centerY - 110);
-            
-            // Z axis label
-            ctx.fillText("Z", centerX - 60, centerY + 65);
-            
-            // Origin label
-            ctx.fillText("Origin (0,0,0)", centerX, centerY + 20);
-            
-            // Add a file info label
-            ctx.fillText(fileName ? `File: ${fileName}` : 'No file loaded', centerX, 40);
-          }
-        }
+        setStatusMessage("LAS viewer ready");
       }, 800);
       
       return () => clearTimeout(loadTimeout);
@@ -365,7 +281,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
-  // Modified handleFrameAll function to properly handle the fitToSphere call
+  // FIX: Modified handleFrameAll function to properly handle the target argument
   const handleFrameAll = (target?: THREE.Object3D) => {
     if (viewerRef.current) {
       try {
@@ -385,8 +301,13 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
+  // Handle scene ready from canvas component
+  const handleSceneReady = (scene: THREE.Scene) => {
+    console.log("Canvas scene is ready");
+  };
+
   return (
-    <div className="w-full max-w-5xl mx-auto">
+    <div className="w-full max-w-5xl mx-auto flex flex-col h-full">
       <ViewerHeader 
         navigate={navigate} 
         openFileDialog={openFileDialog} 
@@ -396,7 +317,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
       />
       
       <Card 
-        className={`relative overflow-hidden border shadow-md transition-all duration-300 ${isDragging ? 'border-primary bg-primary/5' : 'bg-card'}`}
+        className={`relative overflow-hidden border shadow-md transition-all duration-300 flex-1 ${isDragging ? 'border-primary bg-primary/5' : 'bg-card'}`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -417,7 +338,10 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         ) : (
           <ViewerCanvas 
             canvasRef={canvasRef} 
-            isDragging={isDragging} 
+            isDragging={isDragging}
+            fileType={fileType}
+            fileName={fileName}
+            onSceneReady={handleSceneReady}
           />
         )}
 
@@ -426,7 +350,13 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         )}
       </Card>
       
-      <ViewerStatus fileType={fileType} />
+      <ViewerStatusBar 
+        status={statusMessage}
+        fileName={fileName}
+        fileType={fileType}
+        isLoading={loadingModel}
+        info={fileType === "ifc" ? "IFC Viewer" : fileType === "las" ? "LAS Viewer" : "3D Viewer"}
+      />
     </div>
   );
 };
