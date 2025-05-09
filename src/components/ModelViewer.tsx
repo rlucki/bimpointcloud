@@ -87,7 +87,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
               const model = await viewer.IFC.loadIfcUrl(fileUrl);
               console.log("IFC model loaded successfully:", model);
               
-              // Fit to model after loading - FIX: Ensure mesh is properly passed to fitToSphere
+              // Fit to model after loading - Fix: Ensure mesh is properly passed to fitToSphere
               setTimeout(() => {
                 if (viewer && model && model.mesh) {
                   // Fix: Changed from object parameter to boolean parameter
