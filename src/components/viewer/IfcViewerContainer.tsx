@@ -1,8 +1,6 @@
 
 import React from "react";
 import ViewerDropArea from "./ViewerDropArea";
-import { Button } from "@/components/ui/button";
-import { Bug, AlertTriangle } from "lucide-react";
 
 interface IfcViewerContainerProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -10,8 +8,6 @@ interface IfcViewerContainerProps {
   isDragging: boolean;
   modelLoaded: boolean;
   fileName: string | null;
-  onOpenDiagnostics?: () => void;
-  meshExists?: boolean;
 }
 
 const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({ 
@@ -19,9 +15,7 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
   viewerInitialized,
   isDragging,
   modelLoaded,
-  fileName,
-  onOpenDiagnostics,
-  meshExists
+  fileName
 }) => {
   return (
     <div 
@@ -37,11 +31,6 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
           <div className="flex items-center">
             <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
             Model loaded: {fileName}
-            {meshExists === false && (
-              <span className="ml-2 flex items-center text-yellow-300">
-                <AlertTriangle className="h-3 w-3 mr-1" /> No mesh
-              </span>
-            )}
           </div>
         ) : (
           <div className="flex items-center">
@@ -50,22 +39,6 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
           </div>
         )}
       </div>
-      
-      {/* Diagnostics button - Now more prominent when needed */}
-      {((!modelLoaded && onOpenDiagnostics && viewerInitialized) || 
-        (modelLoaded && meshExists === false) || 
-        (modelLoaded && onOpenDiagnostics)) && (
-        <div className="absolute top-4 right-4">
-          <Button 
-            onClick={onOpenDiagnostics}
-            className={`${meshExists === false ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'} text-white flex items-center gap-1 shadow-md`}
-            size="sm"
-          >
-            <Bug className="h-4 w-4" />
-            <span>{meshExists === false ? 'Fix Mesh Issues' : 'Diagnose Model'}</span>
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

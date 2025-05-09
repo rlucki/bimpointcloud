@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from "react";
-import * as THREE from "three";
+import * as THREE from "three";  // Added THREE import
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -14,7 +14,6 @@ import ViewerLoading from "./viewer/ViewerLoading";
 import ViewerCanvas from "./viewer/ViewerCanvas";
 import { useIFCViewer } from "@/hooks/useIFCViewer";
 import IfcViewerContainer from "./viewer/IfcViewerContainer";
-import ViewerDiagnostics from "./viewer/ViewerDiagnostics";
 
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;
@@ -30,16 +29,13 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Initializing...");
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
-  // Use our custom hook for IFC viewer
+  // Use our new custom hook for IFC viewer
   const {
-    viewer,
     isLoading,
     error,
     isInitialized: viewerInitialized,
     modelLoaded,
-    meshExists,
     frameAll,
     debug
   } = useIFCViewer({
@@ -125,21 +121,6 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const handleSceneReady = (scene: THREE.Scene) => {
     console.log("Canvas scene is ready");
   };
-  
-  // Open diagnostics panel
-  const openDiagnostics = () => {
-    setShowDiagnostics(true);
-  };
-  
-  // Close diagnostics panel
-  const closeDiagnostics = () => {
-    setShowDiagnostics(false);
-  };
-  
-  // Reload viewer
-  const reloadViewer = () => {
-    window.location.reload();
-  };
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col h-full">
@@ -148,7 +129,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         openFileDialog={openFileDialog} 
         fileInputRef={fileInputRef}
         handleFileInputChange={handleFileInputChange}
-        debug={openDiagnostics}
+        debug={debug}
       />
       
       <Card 
@@ -168,9 +149,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             viewerInitialized={viewerInitialized}
             isDragging={isDragging}
             modelLoaded={modelLoaded}
-            meshExists={meshExists}
             fileName={fileName}
-            onOpenDiagnostics={openDiagnostics}
           />
         ) : (
           <ViewerCanvas 
@@ -194,19 +173,6 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         isLoading={isLoading}
         info={fileType === "ifc" ? "IFC Viewer" : fileType === "las" ? "LAS Viewer" : "3D Viewer"}
       />
-      
-      {/* Diagnostics modal */}
-      {showDiagnostics && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <ViewerDiagnostics
-            viewer={viewer}
-            fileUrl={fileUrl}
-            fileName={fileName}
-            onClose={closeDiagnostics}
-            onReload={reloadViewer}
-          />
-        </div>
-      )}
     </div>
   );
 };
