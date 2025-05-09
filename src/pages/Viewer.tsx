@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from "@/components/ui/menubar";
@@ -24,7 +23,7 @@ import { IfcViewerAPI } from "web-ifc-viewer";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import PointCloudViewer from "@/components/PointCloudViewer";
-import ViewerContainer from "@/components/ViewerContainer";
+import ViewerContainer, { HtmlOverlay } from "@/components/ViewerContainer";
 
 // Type definitions for the file data
 interface FileData {
@@ -211,6 +210,14 @@ const Viewer = () => {
     setShowStats(prev => !prev);
   };
 
+  // Add a reference for frame-all function
+  const frameAllRef = useRef<() => void>(() => {});
+
+  const handleFrameAll = () => {
+    // Call the frame all function stored in ref
+    frameAllRef.current();
+  };
+
   const frameAll = () => {
     // If using IFC Viewer
     if (viewerRef.current) {
@@ -223,6 +230,11 @@ const Viewer = () => {
       }
     }
   };
+
+  // Store frame all function in ref for access from outside Canvas
+  useEffect(() => {
+    frameAllRef.current = frameAll;
+  }, []);
 
   const goBack = () => {
     navigate('/');
@@ -348,6 +360,9 @@ const Viewer = () => {
                   )}
                 </ViewerContainer>
               </Canvas>
+              
+              {/* Place HTML overlay outside of Canvas */}
+              <HtmlOverlay onFrameAll={handleFrameAll} />
             </div>
           ) : null}
           

@@ -121,62 +121,22 @@ const ViewerContainer: React.FC<ViewerContainerProps> = ({
       {/* Child components (IFC models, point clouds, etc.) */}
       {isReady && children}
       
-      {/* Frame button - added to the scene as HTML */}
-      <Html position={[-10, 5, 0]}>
-        <button 
-          onClick={handleFrameAll}
-          className="bg-[#333333] text-white px-3 py-2 rounded hover:bg-[#444444] flex items-center gap-1 border border-[#444444]"
-        >
-          <span className="material-icons">center_focus_strong</span>
-          Frame All
-        </button>
-      </Html>
+      {/* We're removing the HTML Frame button from here as it causes the error */}
     </>
   );
 };
 
-// Create a helper component for HTML content in the 3D scene
-const Html: React.FC<{ children: React.ReactNode, position: [number, number, number] }> = ({ children, position }) => {
-  const { camera } = useThree();
-  const htmlRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    const updatePosition = () => {
-      if (!htmlRef.current) return;
-      
-      // Convert 3D position to screen space
-      const vector = new THREE.Vector3(...position);
-      vector.project(camera);
-      
-      // Convert to CSS coordinates
-      const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-      const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
-      
-      // Apply the transformation
-      htmlRef.current.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
-    };
-    
-    // Update position on each frame
-    const intervalId = setInterval(updatePosition, 16);
-    window.addEventListener('resize', updatePosition);
-    
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('resize', updatePosition);
-    };
-  }, [camera, position]);
-  
+// Create a separate component for HTML overlay outside of the Canvas component
+export const HtmlOverlay = ({ onFrameAll }: { onFrameAll: () => void }) => {
   return (
-    <div 
-      ref={htmlRef} 
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        pointerEvents: 'auto'
-      }}
-    >
-      {children}
+    <div className="absolute top-4 left-4">
+      <button 
+        onClick={onFrameAll}
+        className="bg-[#333333] text-white px-3 py-2 rounded hover:bg-[#444444] flex items-center gap-1 border border-[#444444]"
+      >
+        <span className="material-icons">center_focus_strong</span>
+        Frame All
+      </button>
     </div>
   );
 };
