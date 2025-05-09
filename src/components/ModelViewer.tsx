@@ -16,6 +16,7 @@ import ViewerLoading from "./viewer/ViewerLoading";
 import ViewerCanvas from "./viewer/ViewerCanvas";
 import ViewerStatusBar from "./viewer/ViewerStatusBar";
 import { useIFCViewer } from "@/hooks/useIFCViewer";
+import { handleFrameAll, debugViewer } from "./viewer/ViewerUtils";
 
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;
@@ -259,77 +260,14 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
-  // Debugging function to show model status
+  // Use the separated utility function for debugging
   const debug = () => {
-    if (viewerRef.current) {
-      console.log("Viewer state:", viewerRef.current);
-      console.log("Scene:", viewerRef.current.context.getScene());
-      console.log("Camera position:", viewerRef.current.context.ifcCamera.cameraControls.getPosition());
-      console.log("Model loaded:", modelLoaded);
-      
-      // Add a visible marker at origin for debugging
-      const geometry = new THREE.SphereGeometry(0.2, 32, 32);
-      const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const sphere = new THREE.Mesh(geometry, material);
-      sphere.position.set(0, 0, 0);
-      viewerRef.current.context.getScene().add(sphere);
-      toast({
-        title: "Debug info",
-        description: "Check console for viewer state",
-      });
-    }
+    debugViewer(viewerRef, toast);
   };
 
-  // FIXED: Modified handleFrameAll function to correctly handle the bounding sphere for any 3D object
-  const handleFrameAll = (target?: THREE.Object3D) => {
-    if (viewerRef.current) {
-      try {
-        if (target) {
-          // If a specific target is provided, frame that object
-          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(target, true);
-        } else {
-          // Find objects in the scene to frame
-          const scene = viewerRef.current.context.getScene();
-          
-          if (scene && scene.children.length > 0) {
-            // Create a bounding box that encompasses all objects
-            const boundingBox = new THREE.Box3();
-            
-            // Add all visible meshes to the bounding box calculation
-            scene.traverse((object) => {
-              if (object.visible && (object instanceof THREE.Mesh || object instanceof THREE.Group)) {
-                boundingBox.expandByObject(object);
-              }
-            });
-            
-            // Only proceed if we found valid objects
-            if (!boundingBox.isEmpty()) {
-              // Create a sphere from the bounding box
-              const boundingSphere = new THREE.Sphere();
-              boundingBox.getBoundingSphere(boundingSphere);
-              
-              // Create a dummy object at the center of the bounding sphere
-              const dummyObject = new THREE.Object3D();
-              dummyObject.position.copy(boundingSphere.center);
-              
-              // Use the dummy object as the target for fitToSphere
-              viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(dummyObject, true);
-              console.log("Framed all objects using bounding sphere");
-            } else {
-              // Fallback: frame the entire scene if bounding box is empty
-              viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
-              console.log("Framed scene (fallback)");
-            }
-          } else if (scene) {
-            // If scene exists but has no children, frame the scene itself
-            viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
-            console.log("Framed empty scene");
-          }
-        }
-      } catch (e) {
-        console.error("Error framing objects:", e);
-      }
-    }
+  // Use the separated utility function for frame all
+  const frameAllObjects = (target?: THREE.Object3D) => {
+    handleFrameAll(viewerRef, target);
   };
 
   // Handle scene ready from canvas component
