@@ -45,7 +45,7 @@ const Index = () => {
       </main>
 
       <footer className="mt-20 border-t border-border py-8 px-6">
-        <div className="container mx-auto flex justify-between items-center">
+        <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <img 
               src="/lovable-uploads/091c544e-5895-4289-a5ea-217d7cf2e97a.png" 
@@ -53,6 +53,9 @@ const Index = () => {
               className="h-8 w-8"
             />
             <span className="text-muted-foreground text-sm">© 2025 IFC & LAS Visualizer</span>
+          </div>
+          <div className="text-muted-foreground text-sm">
+            Made by <span className="text-primary font-medium">Rafael Lucki Morales</span>
           </div>
           <div className="text-muted-foreground text-sm">
             All rights reserved.
