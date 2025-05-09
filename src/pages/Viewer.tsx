@@ -1,4 +1,3 @@
-
 // Integrate the improved logic with the setWasmPath fix into the Viewer component
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -17,7 +16,8 @@ import {
   Layers,
   Eye,
   EyeOff,
-  Move
+  Move,
+  Bug
 } from "lucide-react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -28,6 +28,7 @@ import ViewerContainer, { HtmlOverlay } from "@/components/ViewerContainer";
 import { handleFrameAll as utilsHandleFrameAll, debugViewer } from "@/components/viewer/ViewerUtils";
 import ViewerSidebar from "@/components/viewer/ViewerSidebar";
 import ViewerControls from "@/components/viewer/ViewerControls";
+import ViewerLayout from "@/components/viewer/ViewerLayout";
 
 // Type definitions for the file data
 interface FileData {
@@ -421,135 +422,111 @@ const Viewer = () => {
     );
   }
   
+  // Get current file URL if available
+  const currentFileUrl = files.length > 0 && files[0].fileUrl ? files[0].fileUrl : undefined;
+  const currentFileName = files.length > 0 ? files[0].fileName : null;
+  
+  // Determine the title based on files
+  const viewerTitle = files.length > 0 
+    ? `3D Viewer - ${files.length} file(s)` 
+    : "3D Viewer - Demo Mode";
+  
   return (
-    <div className="min-h-screen flex flex-col bg-[#222222]">
-      {/* Top Navigation Bar */}
-      <header className="bg-[#333333] border-b border-[#444444] h-12 flex items-center justify-between px-4">
-        <div className="flex items-center">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-white hover:bg-[#444444]">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <ViewerSidebar 
-              files={files} 
-              selectedItem={selectedItem} 
-              visibleFiles={visibleFiles}
-              onSelectItem={setSelectedItem}
-              onToggleVisibility={toggleFileVisibility}
-            />
-          </Sheet>
-          
-          <div className="ml-4 text-white font-medium">
-            {files.length > 0 
-              ? `3D Viewer - ${files.length} file(s)` 
-              : "3D Viewer - Demo Mode"}
+    <ViewerLayout
+      title={viewerTitle}
+      onClose={goBack}
+      onToggleFullscreen={toggleFullscreen}
+      onDebug={handleDebug}
+      isFullscreen={isFullscreen}
+      files={files}
+      viewer={viewerRef.current}
+      fileUrl={currentFileUrl}
+      fileName={currentFileName}
+    >
+      {/* Main Viewer Area */}
+      <div className="flex-1 relative">
+        {/* IFC files need the IFC viewer */}
+        {files.some(f => f.fileType === 'ifc') && (
+          <div 
+            ref={containerRef} 
+            className="w-full h-full"
+          >
+            {/* IFC Viewer will be initialized here */}
+            
+            {/* Show error message if loading failed */}
+            {loadingError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+                <div className="bg-card p-6 rounded-lg max-w-md text-center">
+                  <div className="text-red-500 text-4xl mb-4">⚠️</div>
+                  <h3 className="text-xl font-medium mb-2">Error Loading Model</h3>
+                  <p className="text-muted-foreground mb-4">{loadingError}</p>
+                  <Button onClick={goBack}>Return to Upload</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* LAS files use React Three Fiber */}
+        {(files.some(f => f.fileType === 'las') && !files.some(f => f.fileType === 'ifc')) || files.length === 0 ? (
+          <div className="w-full h-full">
+            <Canvas>
+              <ViewerContainer showStats={showStats}>
+                {files.length > 0 ? (
+                  files
+                    .filter(f => f.fileType === 'las' && f.id && visibleFiles[f.id])
+                    .map((file, index) => (
+                      <PointCloudViewer
+                        key={file.id}
+                        url={file.fileUrl}
+                        color="#4f46e5"
+                        opacity={0.8}
+                      />
+                    ))
+                ) : (
+                  // Demo point cloud for empty state
+                  <PointCloudViewer />
+                )}
+              </ViewerContainer>
+            </Canvas>
+            
+            {/* Place HTML overlay outside of Canvas */}
+            <HtmlOverlay onFrameAll={handleFrameAll} />
+          </div>
+        ) : null}
+        
+        {/* Overlay with instructions */}
+        <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded pointer-events-none">
+          <div className="flex items-center gap-2 text-sm">
+            <Axis3d className="h-4 w-4" /> 
+            <span>Origin (0,0,0) with X, Y, Z axes</span>
           </div>
         </div>
         
-        <div className="flex items-center space-x-1">
-          {process.env.NODE_ENV === 'development' && (
-            <Button variant="ghost" size="icon" onClick={handleDebug} className="text-white hover:bg-[#444444]">
-              <Settings className="h-4 w-4" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon" onClick={goBack} className="text-white hover:bg-[#444444]">
-            <X className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-white hover:bg-[#444444]">
-            {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
-          </Button>
+        {/* File info overlay */}
+        <div className="absolute bottom-4 right-4 pointer-events-none">
+          <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
+            <div className="flex items-center gap-2">
+              <File className="h-4 w-4" /> 
+              <span>
+                {files.length > 0 
+                  ? `${files.length} file(s) loaded` 
+                  : "Demo Mode"}
+              </span>
+            </div>
+            <div className="text-xs text-gray-300 mt-1">
+              Use mouse to navigate: drag to rotate, scroll to zoom
+            </div>
+          </div>
         </div>
-      </header>
-      
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Main Viewer Area */}
-        <main className="flex-1 relative">
-          {/* IFC files need the IFC viewer */}
-          {files.some(f => f.fileType === 'ifc') && (
-            <div 
-              ref={containerRef} 
-              className="w-full h-full"
-            >
-              {/* IFC Viewer will be initialized here */}
-              
-              {/* Show error message if loading failed */}
-              {loadingError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-                  <div className="bg-card p-6 rounded-lg max-w-md text-center">
-                    <div className="text-red-500 text-4xl mb-4">⚠️</div>
-                    <h3 className="text-xl font-medium mb-2">Error Loading Model</h3>
-                    <p className="text-muted-foreground mb-4">{loadingError}</p>
-                    <Button onClick={goBack}>Return to Upload</Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* LAS files use React Three Fiber */}
-          {(files.some(f => f.fileType === 'las') && !files.some(f => f.fileType === 'ifc')) || files.length === 0 ? (
-            <div className="w-full h-full">
-              <Canvas>
-                <ViewerContainer showStats={showStats}>
-                  {files.length > 0 ? (
-                    files
-                      .filter(f => f.fileType === 'las' && f.id && visibleFiles[f.id])
-                      .map((file, index) => (
-                        <PointCloudViewer
-                          key={file.id}
-                          url={file.fileUrl}
-                          color="#4f46e5"
-                          opacity={0.8}
-                        />
-                      ))
-                  ) : (
-                    // Demo point cloud for empty state
-                    <PointCloudViewer />
-                  )}
-                </ViewerContainer>
-              </Canvas>
-              
-              {/* Place HTML overlay outside of Canvas */}
-              <HtmlOverlay onFrameAll={handleFrameAll} />
-            </div>
-          ) : null}
-          
-          {/* Overlay with instructions */}
-          <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded pointer-events-none">
-            <div className="flex items-center gap-2 text-sm">
-              <Axis3d className="h-4 w-4" /> 
-              <span>Origin (0,0,0) with X, Y, Z axes</span>
-            </div>
-          </div>
-          
-          {/* File info overlay */}
-          <div className="absolute bottom-4 right-4 pointer-events-none">
-            <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
-              <div className="flex items-center gap-2">
-                <File className="h-4 w-4" /> 
-                <span>
-                  {files.length > 0 
-                    ? `${files.length} file(s) loaded` 
-                    : "Demo Mode"}
-                </span>
-              </div>
-              <div className="text-xs text-gray-300 mt-1">
-                Use mouse to navigate: drag to rotate, scroll to zoom
-              </div>
-            </div>
-          </div>
-          
-          {/* Viewer Controls - now using the separate component */}
-          <ViewerControls
-            onFrameAll={handleFrameAll}
-            onToggleFullscreen={toggleFullscreen}
-            onToggleStats={toggleStats}
-            isFullscreen={isFullscreen}
-          />
-        </main>
+        
+        {/* Viewer Controls - now using the separate component */}
+        <ViewerControls
+          onFrameAll={handleFrameAll}
+          onToggleFullscreen={toggleFullscreen}
+          onToggleStats={toggleStats}
+          isFullscreen={isFullscreen}
+        />
       </div>
       
       {/* Status bar */}
@@ -557,7 +534,7 @@ const Viewer = () => {
         <span>Ready</span>
         <span className="ml-auto">3D Viewer</span>
       </footer>
-    </div>
+    </ViewerLayout>
   );
 };
 
