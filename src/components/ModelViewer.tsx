@@ -361,9 +361,14 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const handleFrameAll = (target?: THREE.Object3D) => {
     if (viewerRef.current) {
       try {
-        // Default behavior for framing all objects
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(viewerRef.current.context.getScene(), true);
-        console.log("Framed all objects");
+        if (target) {
+          // If a specific target is provided, frame that object
+          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(target, true);
+        } else {
+          // Default behavior for framing all objects - pass the scene as the required first argument
+          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(viewerRef.current.context.getScene(), true);
+        }
+        console.log("Framed objects");
       } catch (e) {
         console.error("Error framing objects:", e);
       }
