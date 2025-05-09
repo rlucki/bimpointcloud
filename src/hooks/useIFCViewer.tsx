@@ -1,3 +1,4 @@
+
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -98,11 +99,13 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         
         modelRef.current = model;
         
-        // Wait for the IFC parser to completely finish
-        await viewer.IFC.loader.ifcManager.whenAllDone();
-        
         if (model && model.mesh) {
-          // Frame the model using our new utility function that follows best practices
+          // Force computation of the bounding sphere if needed
+          if (model.mesh.geometry && !model.mesh.geometry.boundingSphere) {
+            model.mesh.geometry.computeBoundingSphere();
+          }
+          
+          // Frame the model using our improved utility function
           await frameIFCModel(viewerRef, model.mesh);
         }
         
@@ -149,8 +152,10 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     if (viewerRef.current) {
       try {
         if (modelRef.current && modelRef.current.mesh) {
-          // Wait for the parser to finish if needed
-          await viewerRef.current.IFC.loader.ifcManager.whenAllDone();
+          // Force computation of the bounding sphere if needed
+          if (modelRef.current.mesh.geometry && !modelRef.current.mesh.geometry.boundingSphere) {
+            modelRef.current.mesh.geometry.computeBoundingSphere();
+          }
           
           // Use our improved framing utility
           await frameIFCModel(viewerRef, modelRef.current.mesh);

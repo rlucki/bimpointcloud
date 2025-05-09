@@ -84,13 +84,19 @@ export const frameIFCModel = async (
   try {
     // If we have a specific mesh, frame it
     if (modelMesh) {
-      // Make sure the parser is done processing
-      await viewerRef.current.IFC.loader.ifcManager.whenAllDone();
+      // Force computation of the bounding sphere if it doesn't exist
+      if (modelMesh.geometry && !modelMesh.geometry.boundingSphere) {
+        modelMesh.geometry.computeBoundingSphere();
+      }
       
       // Calculate bounding box
       const bbox = new THREE.Box3().setFromObject(modelMesh);
-      const center = bbox.getCenter(new THREE.Vector3());
-      const sphere = bbox.getBoundingSphere(new THREE.Sphere());
+      const center = new THREE.Vector3();
+      bbox.getCenter(center);
+      
+      // Create a sphere from the bounding box
+      const sphere = new THREE.Sphere();
+      bbox.getBoundingSphere(sphere);
       
       // Frame the model - important to do this AFTER all other camera operations
       viewerRef.current.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);
