@@ -1,35 +1,17 @@
-// Integrate the improved logic with the setWasmPath fix into the Viewer component
+
+// Refactored Viewer component with smaller, focused components
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Sheet, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { 
-  Menu, 
-  File,
-  X,
-  Settings, 
-  MaximizeIcon,
-  MinimizeIcon,
-  Axis3d,
-  ZoomIn,
-  Layers,
-  Eye,
-  EyeOff,
-  Move,
-  Bug
-} from "lucide-react";
-import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-import PointCloudViewer from "@/components/PointCloudViewer";
-import ViewerContainer, { HtmlOverlay } from "@/components/ViewerContainer";
-import { handleFrameAll as utilsHandleFrameAll, debugViewer } from "@/components/viewer/ViewerUtils";
-import ViewerSidebar from "@/components/viewer/ViewerSidebar";
+import { debugViewer } from "@/components/viewer/ViewerUtils";
 import ViewerControls from "@/components/viewer/ViewerControls";
 import ViewerLayout from "@/components/viewer/ViewerLayout";
 import { useIFCViewer } from "@/hooks/useIFCViewer";
+import IFCViewerContainer from "@/components/viewer/IFCViewerContainer";
+import LASViewerContainer from "@/components/viewer/LASViewerContainer";
+import ViewerLoadingScreen from "@/components/viewer/ViewerLoadingScreen";
+import { AxesInfoOverlay, FileInfoOverlay } from "@/components/viewer/ViewerInfoOverlay";
 
 // Type definitions for the file data
 interface FileData {
@@ -45,7 +27,6 @@ const Viewer = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
@@ -89,7 +70,6 @@ const Viewer = () => {
   const currentFileName = files.length > 0 ? files[0].fileName : null;
   
   // IMPORTANT: Always call hooks unconditionally at the top level
-  // This fixes the "Rendered more hooks than during the previous render" error
   const { 
     viewer: ifcViewer,
     mesh,
@@ -128,201 +108,14 @@ const Viewer = () => {
       // Simulate loading
       const timer = setTimeout(() => {
         setIsLoading(false);
-        
-        // If there's an IFC file, initialize the IFC viewer
-        const ifcFile = files.find(file => file.fileType === 'ifc');
-        if (ifcFile) {
-          initializeIfcViewer(ifcFile);
-        }
       }, 1000);
       
       return () => clearTimeout(timer);
     }
   }, [files, isDemoMode, navigate, toast]);
   
-  const initializeIfcViewer = async (fileData: FileData) => {
-    if (!containerRef.current) return;
-    
-    try {
-      console.log("Initializing IFC viewer for:", fileData.fileName);
-      
-      // Create the viewer with enhanced settings
-      const viewer = new IfcViewerAPI({
-        container: containerRef.current,
-        backgroundColor: new THREE.Color(0x222222)
-      });
-      
-      viewerRef.current = viewer;
-      
-      // Set WASM path with dynamic base URL
-      const wasmPath = import.meta.env.BASE_URL.replace(/\/$/, '') + '/wasm/';
-      console.log("Setting WASM path to:", wasmPath);
-      await viewer.IFC.setWasmPath(wasmPath);
-      
-      // Set up camera
-      viewer.context.ifcCamera.cameraControls.setPosition(10, 10, 10);
-      viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
-      
-      // Create a grid
-      const grid = new THREE.GridHelper(50, 50, 0xffffff, 0x888888);
-      grid.position.set(0, 0, 0);
-      viewer.context.getScene().add(grid);
-      
-      // Add axes
-      const axesHelper = new THREE.AxesHelper(10);
-      axesHelper.position.set(0, 0.1, 0);
-      viewer.context.getScene().add(axesHelper);
-      
-      // Add better lighting for IFC models
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-      viewer.context.getScene().add(ambientLight);
-      
-      const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight1.position.set(5, 10, 7);
-      viewer.context.getScene().add(directionalLight1);
-      
-      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-      directionalLight2.position.set(-5, 5, -5);
-      viewer.context.getScene().add(directionalLight2);
-      
-      // Add a reference cube at origin to make sure the scene is rendering
-      const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-      const material = new THREE.MeshStandardMaterial({ 
-        color: 0xff0000, 
-        wireframe: true 
-      });
-      const cube = new THREE.Mesh(geometry, material);
-      cube.position.set(0, 0.3, 0);
-      viewer.context.getScene().add(cube);
-      
-      // Load all IFC models
-      for (const file of files.filter(f => f.fileType === 'ifc')) {
-        try {
-          console.log(`Loading IFC model: ${file.fileName} from URL: ${file.fileUrl}`);
-          
-          if (file.fileUrl) {
-            // Try loading the file
-            const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
-            
-            // Store reference to the model
-            if (file.id) {
-              modelRefs.current[file.id] = model;
-            }
-            
-            console.log("IFC model loaded successfully:", model);
-            
-            // Calculate model bounds and handle potential issues with position/scale
-            if (model && model.mesh) {
-              const box = new THREE.Box3().setFromObject(model.mesh);
-              const size = new THREE.Vector3();
-              const center = new THREE.Vector3();
-              box.getSize(size);
-              box.getCenter(center);
-              
-              console.table({
-                min: box.min,        // minimum coordinate
-                max: box.max,        // maximum coordinate
-                size,                // length × height × width
-                center               // geometric center
-              });
-              
-              // Handle extremely large coordinates (UTM/EPSG format)
-              if (box.min.length() > 100000 || box.max.length() > 100000) {
-                console.warn("Model has extremely large coordinates - recentering");
-                model.mesh.position.sub(center); // Recenter the model
-              }
-              
-              // Handle models in millimeters
-              if (size.length() > 10000) {
-                console.warn("Model appears to be in millimeters - scaling down");
-                model.mesh.scale.setScalar(0.001); // Convert mm to m
-              }
-              
-              // Adjust camera planes for the scene scale
-              const camera = viewer.context.getCamera() as THREE.PerspectiveCamera;
-              camera.near = 0.1;
-              camera.far = Math.max(10000, size.length() * 20);
-              camera.updateProjectionMatrix();
-              console.log("Camera near/far adjusted:", {near: camera.near, far: camera.far});
-              
-              // Frame the model for proper viewing
-              setTimeout(() => {
-                if (viewer && model && model.mesh) {
-                  viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
-                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
-                }
-              }, 500);
-            }
-            
-            toast({
-              title: "Model loaded",
-              description: `Successfully loaded ${file.fileName}`,
-            });
-          } else {
-            console.warn(`No URL provided for file: ${file.fileName}`);
-            // Use example model if no URL is provided
-            const exampleUrl = "https://examples.ifcjs.io/models/ifc/SametLibrary.ifc";
-            console.log(`Using example IFC model from: ${exampleUrl}`);
-            
-            toast({
-              title: "Loading example",
-              description: "No file URL provided, loading example model",
-            });
-            
-            try {
-              // IMPORTANT: Set the WebAssembly path first
-              await viewer.IFC.setWasmPath("/wasm/");
-              console.log("WASM path set for example model");
-              
-              const model = await viewer.IFC.loadIfcUrl(exampleUrl);
-              console.log("Example IFC model loaded successfully");
-              
-              // Handle model positioning and framing
-              if (model && model.mesh) {
-                const box = new THREE.Box3().setFromObject(model.mesh);
-                const center = new THREE.Vector3();
-                box.getCenter(center);
-                
-                // Recenter if needed
-                if (center.length() > 100) {
-                  model.mesh.position.sub(center);
-                }
-                
-                // Fit to model
-                setTimeout(() => {
-                  viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
-                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
-                }, 500);
-              }
-            } catch (e) {
-              console.error("Error loading example model:", e);
-              setLoadingError("Could not load example model. Check network connection.");
-            }
-          }
-        } catch (e) {
-          console.error(`Error loading IFC model ${file.fileName}:`, e);
-          setLoadingError(`Error loading model ${file.fileName}. The file might be corrupted or inaccessible.`);
-          toast({
-            variant: "destructive",
-            title: `Error loading ${file.fileName}`,
-            description: "The IFC model could not be loaded."
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Error initializing IFC viewer:", e);
-      setLoadingError("Failed to initialize the viewer. Please try again.");
-      toast({
-        variant: "destructive",
-        title: "Viewer initialization failed",
-        description: "Could not initialize the 3D viewer.",
-      });
-    }
-  };
-
-  // Updated function to properly toggle IFC model visibility
+  // Update visible files function
   const toggleFileVisibility = (fileId: string) => {
-    // Update visibility state
     setVisibleFiles(prev => {
       const newState = { ...prev, [fileId]: !prev[fileId] };
       
@@ -358,7 +151,6 @@ const Viewer = () => {
         // Force scene update
         if (viewerRef.current) {
           viewerRef.current.context.getScene().updateMatrixWorld();
-          // Eliminamos la llamada al método update() que no existe en esta versión
         }
         
         console.log("Model visibility updated", { model, isVisible });
@@ -393,7 +185,7 @@ const Viewer = () => {
   // Add a reference for frame-all function
   const frameAllRef = useRef<() => void>(() => {});
 
-  // Fix: Remove the unused parameter to match expected function signature
+  // Handle frame all
   const handleFrameAll = () => {
     // Call the frame all function stored in ref
     frameAllRef.current();
@@ -404,7 +196,7 @@ const Viewer = () => {
     frameAllRef.current = frameAll;
   }, [frameAll]);
   
-  // Use the improved debug viewer utility
+  // Debug viewer utility
   const handleDebug = () => {
     if (viewerRef.current) {
       debugViewer(viewerRef, toast);
@@ -414,23 +206,14 @@ const Viewer = () => {
     }
   };
 
+  // Go back to main page
   const goBack = () => {
     navigate('/');
   };
   
   // If loading, show loader
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#222222] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4 mx-auto"></div>
-          <p className="text-white text-lg">Loading viewer...</p>
-          <p className="text-gray-400 text-sm mt-2">
-            {isDemoMode ? "Preparing demo environment" : `Loading ${files.length} file(s)`}
-          </p>
-        </div>
-      </div>
-    );
+    return <ViewerLoadingScreen isDemoMode={isDemoMode} filesCount={files.length} />;
   }
   
   // Determine the title based on files
@@ -438,100 +221,55 @@ const Viewer = () => {
     ? `3D Viewer - ${files.length} file(s)` 
     : "3D Viewer - Demo Mode";
   
+  // Determine which viewer type to show
+  const showIFCViewer = files.some(f => f.fileType === 'ifc');
+  const showLASViewer = (files.some(f => f.fileType === 'las') && !files.some(f => f.fileType === 'ifc')) || files.length === 0;
+  
   return (
     <ViewerLayout
       title={viewerTitle}
       onClose={() => navigate('/')}
       onToggleFullscreen={toggleFullscreen}
-      onDebug={debug} // Use debug from useIFCViewer hook
+      onDebug={debug}
       isFullscreen={isFullscreen}
       files={files}
-      viewer={viewerRef.current || ifcViewer} // Use the viewer from the hook if viewerRef isn't set
+      viewer={viewerRef.current || ifcViewer}
       fileUrl={currentFileUrl}
       fileName={currentFileName}
-      // Pass diagnostic status
       wasmLoaded={wasmLoaded}
       modelLoaded={modelLoaded}
       meshExists={meshExists}
     >
       {/* Main Viewer Area */}
       <div className="flex-1 relative">
-        {/* IFC files need the IFC viewer */}
-        {files.some(f => f.fileType === 'ifc') && (
-          <div 
-            ref={containerRef} 
-            className="w-full h-full"
-          >
-            {/* IFC Viewer will be initialized here */}
-            
-            {/* Show error message if loading failed */}
-            {loadingError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-                <div className="bg-card p-6 rounded-lg max-w-md text-center">
-                  <div className="text-red-500 text-4xl mb-4">⚠️</div>
-                  <h3 className="text-xl font-medium mb-2">Error Loading Model</h3>
-                  <p className="text-muted-foreground mb-4">{loadingError}</p>
-                  <Button onClick={goBack}>Return to Upload</Button>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* IFC Viewer Container */}
+        {showIFCViewer && (
+          <IFCViewerContainer 
+            containerRef={containerRef}
+            viewerRef={viewerRef}
+            modelRefs={modelRefs}
+            files={files}
+            loadingError={loadingError}
+            setLoadingError={setLoadingError}
+            onBack={goBack}
+          />
         )}
         
-        {/* LAS files use React Three Fiber */}
-        {(files.some(f => f.fileType === 'las') && !files.some(f => f.fileType === 'ifc')) || files.length === 0 ? (
-          <div className="w-full h-full">
-            <Canvas>
-              <ViewerContainer showStats={showStats}>
-                {files.length > 0 ? (
-                  files
-                    .filter(f => f.fileType === 'las' && f.id && visibleFiles[f.id])
-                    .map((file, index) => (
-                      <PointCloudViewer
-                        key={file.id}
-                        url={file.fileUrl}
-                        color="#4f46e5"
-                        opacity={0.8}
-                      />
-                    ))
-                ) : (
-                  // Demo point cloud for empty state
-                  <PointCloudViewer />
-                )}
-              </ViewerContainer>
-            </Canvas>
-            
-            {/* Place HTML overlay outside of Canvas */}
-            <HtmlOverlay onFrameAll={handleFrameAll} />
-          </div>
-        ) : null}
+        {/* LAS Viewer Container */}
+        {showLASViewer && (
+          <LASViewerContainer 
+            files={files}
+            visibleFiles={visibleFiles}
+            showStats={showStats}
+            onFrameAll={handleFrameAll}
+          />
+        )}
         
-        {/* Overlay with instructions */}
-        <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded pointer-events-none">
-          <div className="flex items-center gap-2 text-sm">
-            <Axis3d className="h-4 w-4" /> 
-            <span>Origin (0,0,0) with X, Y, Z axes</span>
-          </div>
-        </div>
+        {/* Common UI Overlays */}
+        <AxesInfoOverlay />
+        <FileInfoOverlay filesCount={files.length} />
         
-        {/* File info overlay */}
-        <div className="absolute bottom-4 right-4 pointer-events-none">
-          <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
-            <div className="flex items-center gap-2">
-              <File className="h-4 w-4" /> 
-              <span>
-                {files.length > 0 
-                  ? `${files.length} file(s) loaded` 
-                  : "Demo Mode"}
-              </span>
-            </div>
-            <div className="text-xs text-gray-300 mt-1">
-              Use mouse to navigate: drag to rotate, scroll to zoom
-            </div>
-          </div>
-        </div>
-        
-        {/* Viewer Controls - now using the separate component */}
+        {/* Viewer Controls */}
         <ViewerControls
           onFrameAll={handleFrameAll}
           onToggleFullscreen={toggleFullscreen}
