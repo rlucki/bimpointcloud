@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from "@/components/ui/menubar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -10,11 +10,13 @@ import {
   File,
   X,
   Settings, 
-  ChevronLeft, 
   MaximizeIcon,
   MinimizeIcon,
   Axis3d,
-  ZoomIn
+  ZoomIn,
+  Layers,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -29,6 +31,8 @@ interface FileData {
   fileName: string;
   fileSize: number;
   fileUrl?: string;
+  visible?: boolean;
+  id?: string;
 }
 
 const Viewer = () => {
@@ -39,15 +43,37 @@ const Viewer = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [visibleFiles, setVisibleFiles] = useState<{[key: string]: boolean}>({});
   
   // Extract files from location state
   const state = location.state || {};
-  const files: FileData[] = state.files || [];
+  const [files, setFiles] = useState<FileData[]>(() => {
+    const initialFiles = state.files || [];
+    // Add IDs and visibility to files
+    return initialFiles.map((file: FileData) => ({
+      ...file,
+      id: `${file.fileName}-${Date.now() + Math.random() * 1000}`,
+      visible: true
+    }));
+  });
   const isDemoMode = state.demo || files.length === 0;
   
   // References for the IFC viewer
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
+  const modelRefs = useRef<{[key: string]: any}>({});
+  
+  // Initialize visibility state for files
+  useEffect(() => {
+    const initialVisibility: {[key: string]: boolean} = {};
+    files.forEach(file => {
+      if (file.id) {
+        initialVisibility[file.id] = true;
+      }
+    });
+    setVisibleFiles(initialVisibility);
+  }, []);
   
   // If no files and not in demo mode, redirect to the main page
   useEffect(() => {
@@ -82,7 +108,7 @@ const Viewer = () => {
     try {
       console.log("Initializing IFC viewer for:", fileData.fileName);
       
-      // Create the viewer
+      // Create the viewer with ThatOpen enhancements
       const viewer = new IfcViewerAPI({
         container: containerRef.current,
         backgroundColor: new THREE.Color(0x222222)
@@ -104,25 +130,32 @@ const Viewer = () => {
       axesHelper.position.set(0, 0.1, 0);
       viewer.context.getScene().add(axesHelper);
       
-      // Load the IFC model if URL is available
-      if (fileData.fileUrl) {
+      // Load all IFC models
+      for (const file of files.filter(f => f.fileType === 'ifc' && f.fileUrl)) {
         try {
-          const model = await viewer.IFC.loadIfcUrl(fileData.fileUrl);
-          console.log("IFC model loaded:", model);
+          console.log(`Loading IFC model: ${file.fileName}`);
+          const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
           
-          // Center view on the model
-          setTimeout(() => {
-            viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
-          }, 500);
+          // Store reference to the model
+          if (file.id) {
+            modelRefs.current[file.id] = model;
+          }
+          
+          console.log("IFC model loaded:", model);
         } catch (e) {
-          console.error("Error loading IFC model:", e);
+          console.error(`Error loading IFC model ${file.fileName}:`, e);
           toast({
             variant: "destructive",
-            title: "Error loading model",
-            description: "The IFC model could not be loaded. Showing reference only."
+            title: `Error loading ${file.fileName}`,
+            description: "The IFC model could not be loaded."
           });
         }
       }
+      
+      // Center view on all models
+      setTimeout(() => {
+        viewer.context.ifcCamera.cameraControls.fitToSphere(viewer.context.getScene(), true);
+      }, 500);
     } catch (e) {
       console.error("Error initializing IFC viewer:", e);
       toast({
@@ -131,6 +164,24 @@ const Viewer = () => {
         description: "Could not initialize the 3D viewer.",
       });
     }
+  };
+
+  const toggleFileVisibility = (fileId: string) => {
+    // Update visibility state
+    setVisibleFiles(prev => {
+      const newState = { ...prev, [fileId]: !prev[fileId] };
+      
+      // Update IFC model visibility if it's an IFC file
+      const model = modelRefs.current[fileId];
+      if (model) {
+        const isVisible = newState[fileId];
+        if (model.mesh) {
+          model.mesh.visible = isVisible;
+        }
+      }
+      
+      return newState;
+    });
   };
 
   const toggleFullscreen = () => {
@@ -149,6 +200,10 @@ const Viewer = () => {
         });
       }
     }
+  };
+
+  const toggleStats = () => {
+    setShowStats(prev => !prev);
   };
 
   const goBack = () => {
@@ -189,14 +244,27 @@ const Viewer = () => {
                 <h3 className="text-sm font-medium mb-2">LOADED FILES</h3>
                 <ul>
                   {files.length > 0 ? (
-                    files.map((file, index) => (
+                    files.map((file) => (
                       <li 
-                        key={index}
-                        className={`py-1 px-2 rounded cursor-pointer text-sm flex items-center ${selectedItem === file.fileName ? 'bg-[#444444]' : 'hover:bg-[#3a3a3a]'}`}
-                        onClick={() => setSelectedItem(file.fileName)}
+                        key={file.id}
+                        className={`py-1 px-2 rounded cursor-pointer text-sm flex items-center justify-between ${selectedItem === file.fileName ? 'bg-[#444444]' : 'hover:bg-[#3a3a3a]'}`}
                       >
-                        <File className="h-4 w-4 mr-2" /> 
-                        {file.fileName} <span className="ml-2 text-xs opacity-50">{file.fileType.toUpperCase()}</span>
+                        <div className="flex items-center" onClick={() => setSelectedItem(file.fileName)}>
+                          <File className="h-4 w-4 mr-2" /> 
+                          {file.fileName} <span className="ml-2 text-xs opacity-50">{file.fileType.toUpperCase()}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => file.id && toggleFileVisibility(file.id)}
+                        >
+                          {file.id && visibleFiles[file.id] ? (
+                            <Eye className="h-4 w-4" />
+                          ) : (
+                            <EyeOff className="h-4 w-4" />
+                          )}
+                        </Button>
                       </li>
                     ))
                   ) : (
@@ -241,34 +309,29 @@ const Viewer = () => {
           )}
           
           {/* LAS files use React Three Fiber */}
-          {files.some(f => f.fileType === 'las') && !files.some(f => f.fileType === 'ifc') && (
+          {(files.some(f => f.fileType === 'las') && !files.some(f => f.fileType === 'ifc')) || files.length === 0 ? (
             <div className="w-full h-full">
               <Canvas>
-                <ViewerContainer>
-                  {files.filter(f => f.fileType === 'las').map((file, index) => (
-                    <PointCloudViewer
-                      key={index}
-                      url={file.fileUrl}
-                      color="#4f46e5"
-                      opacity={0.8}
-                    />
-                  ))}
+                <ViewerContainer showStats={showStats}>
+                  {files.length > 0 ? (
+                    files
+                      .filter(f => f.fileType === 'las' && f.id && visibleFiles[f.id])
+                      .map((file, index) => (
+                        <PointCloudViewer
+                          key={file.id}
+                          url={file.fileUrl}
+                          color="#4f46e5"
+                          opacity={0.8}
+                        />
+                      ))
+                  ) : (
+                    // Demo point cloud for empty state
+                    <PointCloudViewer />
+                  )}
                 </ViewerContainer>
               </Canvas>
             </div>
-          )}
-          
-          {/* Demo mode when no files */}
-          {files.length === 0 && (
-            <div className="w-full h-full">
-              <Canvas>
-                <ViewerContainer>
-                  {/* Demo point cloud */}
-                  <PointCloudViewer />
-                </ViewerContainer>
-              </Canvas>
-            </div>
-          )}
+          ) : null}
           
           {/* Overlay with instructions */}
           <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded">
@@ -305,6 +368,16 @@ const Viewer = () => {
               className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
             >
               {isFullscreen ? <MinimizeIcon className="h-5 w-5" /> : <MaximizeIcon className="h-5 w-5" />}
+            </Button>
+            
+            <Button 
+              onClick={toggleStats}
+              variant="outline" 
+              size="icon"
+              title="Toggle performance stats"
+              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
+            >
+              <Settings className="h-5 w-5" />
             </Button>
           </div>
         </main>
