@@ -1,42 +1,41 @@
 
 import React, { useRef, useState } from "react";
-import * as THREE from "three";  // Added THREE import
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import ViewerHeader from "./viewer/ViewerHeader";
 import ViewerStatusBar from "./viewer/ViewerStatusBar";
-import ViewerDropArea from "./viewer/ViewerDropArea";
 import ViewerPlaceholder from "./viewer/ViewerPlaceholder";
 import ViewerError from "./viewer/ViewerError";
 import ViewerLoading from "./viewer/ViewerLoading";
-import ViewerCanvas from "./viewer/ViewerCanvas";
 import { useIFCViewer } from "@/hooks/useIFCViewer";
 import IfcViewerContainer from "./viewer/IfcViewerContainer";
+import LoadingOverlay from "./viewer/LoadingOverlay";
 
 interface ModelViewerProps {
-  fileType: "ifc" | "las" | null;
+  fileType: "ifc" | null;
   fileName: string | null;
   fileUrl?: string;
 }
 
 const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Initializing...");
+  const [statusMessage, setStatusMessage] = useState("Ready");
 
-  // Use our new custom hook for IFC viewer
+  // Use our custom hook for IFC viewer
   const {
     isLoading,
     error,
+    errorDetails,
     isInitialized: viewerInitialized,
     modelLoaded,
+    loadingStatus,
     frameAll,
+    retry,
     debug
   } = useIFCViewer({
     containerRef,
@@ -74,27 +73,29 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
 
   const handleFileSelected = (file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    if (fileExtension === 'ifc' || fileExtension === 'las') {
+    if (fileExtension === 'ifc') {
       // Process file
       toast({
         title: "File received",
         description: `Processing ${file.name}...`,
       });
       
-      // In a real implementation, we would load this file into the viewer
-      // For now, we'll just set the file info and reload the viewer
-      const newFileType = fileExtension as "ifc" | "las";
+      // Create a URL for the file
+      const fileURL = URL.createObjectURL(file);
+      
+      // Now navigate with both the file name and URL
       navigate('/viewer', { 
         state: { 
-          fileType: newFileType, 
+          fileType: 'ifc' as const, 
           fileName: file.name,
+          fileUrl: fileURL // Pass the object URL
         }
       });
     } else {
       toast({
         variant: "destructive",
         title: "Unsupported file format",
-        description: "Please upload an IFC or LAS file.",
+        description: "Please upload an IFC file.",
       });
     }
   };
@@ -117,10 +118,31 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
-  // Handle scene ready from canvas component
-  const handleSceneReady = (scene: THREE.Scene) => {
-    console.log("Canvas scene is ready");
-  };
+  // Update status message based on viewer state
+  React.useEffect(() => {
+    if (isLoading) {
+      setStatusMessage(loadingStatus);
+    } else if (error) {
+      setStatusMessage("Error: " + error);
+    } else if (modelLoaded) {
+      setStatusMessage("Model loaded: " + fileName);
+    } else if (viewerInitialized) {
+      setStatusMessage("Viewer ready - no model loaded");
+    } else {
+      setStatusMessage("Initializing...");
+    }
+  }, [isLoading, error, modelLoaded, viewerInitialized, fileName, loadingStatus]);
+
+  // Show loading overlay if we're loading
+  if (isLoading) {
+    return (
+      <LoadingOverlay 
+        isDemoMode={!fileUrl} 
+        filesCount={fileUrl ? 1 : 0} 
+        statusMessage={loadingStatus} 
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col h-full">
@@ -139,10 +161,13 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {isLoading ? (
-          <ViewerLoading fileName={fileName} />
-        ) : error ? (
-          <ViewerError error={error} navigate={navigate} />
+        {error ? (
+          <ViewerError 
+            error={error} 
+            details={errorDetails || undefined}
+            navigate={navigate} 
+            onRetry={retry}
+          />
         ) : fileType === 'ifc' ? (
           <IfcViewerContainer 
             containerRef={containerRef}
@@ -151,17 +176,9 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             modelLoaded={modelLoaded}
             fileName={fileName}
           />
-        ) : (
-          <ViewerCanvas 
-            canvasRef={canvasRef} 
-            isDragging={isDragging}
-            fileType={fileType}
-            fileName={fileName}
-            onSceneReady={handleSceneReady}
-          />
-        )}
+        ) : null}
 
-        {!fileType && !fileName && !isLoading && !error && (
+        {!fileType && !fileName && !error && (
           <ViewerPlaceholder openFileDialog={openFileDialog} />
         )}
       </Card>
@@ -171,7 +188,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         fileName={fileName}
         fileType={fileType}
         isLoading={isLoading}
-        info={fileType === "ifc" ? "IFC Viewer" : fileType === "las" ? "LAS Viewer" : "3D Viewer"}
+        info={"IFC Viewer"}
       />
     </div>
   );

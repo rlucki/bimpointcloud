@@ -15,7 +15,9 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing viewer...");
   const viewerRef = useRef<IfcViewerAPI | null>(null);
   const modelRef = useRef<any>(null);
   const { toast } = useToast();
@@ -28,6 +30,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       try {
         if (!containerRef.current) return;
         
+        setLoadingStatus("Creating IFC viewer...");
         console.log("Initializing IFC viewer...");
         
         // Create the viewer
@@ -58,8 +61,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         directionalLight.position.set(5, 10, 3);
         viewer.context.getScene().add(directionalLight);
         
+        setLoadingStatus("Viewer initialized successfully");
         setIsInitialized(true);
-        setIsLoading(false);
         
         // Try to load model if URL is provided
         if (fileUrl) {
@@ -76,11 +79,13 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           viewer.context.getScene().add(cube);
           
           setIsLoading(false);
+          setLoadingStatus("Demo mode - no IFC model");
         }
         
       } catch (e) {
         console.error("Error initializing IFC viewer:", e);
         setError("Failed to initialize IFC viewer. Please try again.");
+        setErrorDetails(e instanceof Error ? e.message : String(e));
         setIsLoading(false);
         toast({
           variant: "destructive",
@@ -94,12 +99,14 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     const loadModel = async (viewer: IfcViewerAPI, url: string) => {
       try {
         console.log("Loading IFC model from URL:", url);
+        setLoadingStatus("Setting up WebAssembly for IFC parsing...");
         
         // IMPORTANT: Set the WebAssembly path before loading the model
-        // This is crucial for the IFC parser to work correctly
+        // Ensure this path points to your actual WASM files
         await viewer.IFC.setWasmPath("/wasm/");
         console.log("WASM path set for IFC parser");
         
+        setLoadingStatus(`Loading model: ${fileName || url}...`);
         const model = await viewer.IFC.loadIfcUrl(url);
         console.log("IFC model loaded successfully:", model);
         
@@ -141,11 +148,13 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         
         if (model && model.mesh) {
           // Frame the model using our improved utility function
+          setLoadingStatus("Preparing view...");
           await frameIFCModel(viewerRef, model.mesh);
         }
         
         setModelLoaded(true);
         setIsLoading(false);
+        setLoadingStatus("Model loaded successfully");
         
         toast({
           title: "Model Loaded",
@@ -154,6 +163,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       } catch (e) {
         console.error("Error loading IFC model:", e);
         setError("Failed to load IFC model. The file might be corrupted or in an unsupported format.");
+        setErrorDetails(e instanceof Error ? e.message : String(e));
         setIsLoading(false);
         
         // Add a demo cube to show that the viewer is working
@@ -165,6 +175,12 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         const cube = new THREE.Mesh(geometry, material);
         cube.position.set(0, 1, 0);
         viewer.context.getScene().add(cube);
+        
+        toast({
+          variant: "destructive",
+          title: "Model loading failed",
+          description: "Could not load the IFC model.",
+        });
       }
     };
     
@@ -195,10 +211,41 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         }
         console.log("Framed all objects");
+        toast({
+          title: "View adjusted",
+          description: "Camera position optimized",
+        });
       } catch (e) {
         console.error("Error framing objects:", e);
       }
     }
+  };
+  
+  // Reload the viewer and try loading the model again
+  const retry = async () => {
+    setIsLoading(true);
+    setError(null);
+    setErrorDetails(null);
+    
+    // Dispose of the current viewer if it exists
+    if (viewerRef.current) {
+      try {
+        viewerRef.current.dispose();
+        viewerRef.current = null;
+      } catch (e) {
+        console.error("Error disposing viewer during retry:", e);
+      }
+    }
+    
+    // Wait a moment to ensure disposal is complete
+    setTimeout(() => {
+      // Reset loading state
+      setLoadingStatus("Initializing viewer...");
+      setIsInitialized(false);
+      setModelLoaded(false);
+      
+      // The effect will trigger again and re-initialize the viewer
+    }, 500);
   };
   
   // Debug function
@@ -208,12 +255,33 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       console.log("Scene:", viewerRef.current.context.getScene());
       console.log("Model:", modelRef.current);
       
+      // Diagnostic information about the wasm path
+      console.log("WASM information:");
+      try {
+        const wasmPath = viewerRef.current.IFC.getWasmPath();
+        console.log("Current WASM path:", wasmPath);
+      } catch (e) {
+        console.log("Could not get WASM path:", e);
+      }
+      
+      // Test if the wasm files are accessible
+      fetch('/wasm/web-ifc.wasm')
+        .then(response => {
+          if (response.ok) {
+            console.log("WASM file accessible:", response.url);
+          } else {
+            console.error("WASM file not found or inaccessible:", response.url);
+          }
+        })
+        .catch(error => console.error("Error checking WASM file:", error));
+      
       // Add a visible marker at origin for debugging
       const geometry = new THREE.SphereGeometry(0.2, 32, 32);
       const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(0, 0, 0);
       viewerRef.current.context.getScene().add(sphere);
+      
       toast({
         title: "Debug info",
         description: "Check console for viewer state",
@@ -226,8 +294,11 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     isInitialized,
     isLoading,
     error,
+    errorDetails,
     modelLoaded,
+    loadingStatus,
     frameAll,
+    retry,
     debug
   };
 };
