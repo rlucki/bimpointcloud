@@ -50,7 +50,7 @@ const ViewerContainer: React.FC<ViewerContainerProps> = ({
       // Get all visible objects in the scene
       const visibleObjects = [];
       scene.traverse((object) => {
-        if (object.type === 'Mesh' && object.visible) {
+        if ((object.type === 'Mesh' || object.type === 'Points') && object.visible) {
           visibleObjects.push(object);
         }
       });
@@ -120,8 +120,6 @@ const ViewerContainer: React.FC<ViewerContainerProps> = ({
       
       {/* Child components (IFC models, point clouds, etc.) */}
       {isReady && children}
-      
-      {/* We're removing the HTML Frame button from here as it causes the error */}
     </>
   );
 };

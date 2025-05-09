@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Points, PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,75 +9,73 @@ interface PointCloudProps {
   color?: string;
   size?: number;
   opacity?: number;
+  pointCount?: number;
 }
 
-// Componente para visualizar nubes de puntos LAS
+// Component for visualizing point clouds with Three.js
 const PointCloudViewer: React.FC<PointCloudProps> = ({ 
   url, 
   color = '#4f46e5', 
   size = 0.03, 
-  opacity = 0.8 
+  opacity = 0.8,
+  pointCount = 15000 
 }) => {
   const [points, setPoints] = useState<Float32Array | null>(null);
   const [colors, setColors] = useState<Float32Array | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { scene } = useThree();
-  const pointsRef = useRef();
-
-  // Cuando se proporciona una URL, intentamos cargar la nube de puntos
+  
+  // When a URL is provided, try to load the point cloud
   useEffect(() => {
     if (url) {
       setIsLoading(true);
-      console.log("Intentando cargar nube de puntos desde:", url);
+      console.log("Trying to load point cloud from:", url);
       
-      // Para un archivo LAS real, necesitaríamos usar un parser específico
-      // Como no tenemos uno implementado, simulamos la carga
-      // En una implementación real, aquí se procesaría el archivo LAS
+      // For a real LAS file, we would need to use a specific parser
+      // For now, we'll simulate the loading
       
       fetch(url)
         .then(response => {
           if (!response.ok) {
-            throw new Error(`Error al cargar archivo: ${response.statusText}`);
+            throw new Error(`Error loading file: ${response.statusText}`);
           }
           
-          console.log("Archivo recibido, procesando...");
-          // Simulamos puntos para la demostración
-          // En una implementación real aquí procesaríamos el archivo LAS
+          console.log("File received, processing...");
+          // Simulate points for the demonstration
           setTimeout(() => {
-            console.log("Generando nube de puntos simulada");
-            // Generamos 50000 puntos para simular un archivo LAS
+            console.log("Generating simulated point cloud");
+            // Generate points to simulate a LAS file
             const count = 50000;
             const positions = new Float32Array(count * 3);
             const colors = new Float32Array(count * 3);
             const color = new THREE.Color();
             
             for (let i = 0; i < count; i++) {
-              // Distribución en esfera para simular terreno
-              const r = 5 * Math.cbrt(Math.random()); // Raíz cúbica para mejor distribución
-              const theta = Math.random() * Math.PI * 2; // Ángulo horizontal
-              const phi = Math.acos(2 * Math.random() - 1); // Ángulo vertical
+              // Distribution in sphere to simulate terrain
+              const r = 5 * Math.cbrt(Math.random()); // Cubic root for better distribution
+              const theta = Math.random() * Math.PI * 2; // Horizontal angle
+              const phi = Math.acos(2 * Math.random() - 1); // Vertical angle
               
               positions[i * 3] = r * Math.sin(phi) * Math.cos(theta); // x
               positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta); // y
-              positions[i * 3 + 2] = r * Math.cos(phi) - 2; // z (desplazado hacia abajo)
+              positions[i * 3 + 2] = r * Math.cos(phi) - 2; // z (shifted down)
               
-              // Color basado en altura (z)
+              // Color based on height (z)
               const height = positions[i * 3 + 2];
               if (height < -3) {
-                color.set('#0047AB'); // Azul para puntos bajos
+                color.set('#0047AB'); // Blue for low points
               } else if (height < -2) {
-                color.set('#0096FF'); // Azul claro
+                color.set('#0096FF'); // Light blue
               } else if (height < -1) {
-                color.set('#00BFFF'); // Celeste
+                color.set('#00BFFF'); // Sky blue
               } else if (height < 0) {
-                color.set('#40E0D0'); // Turquesa
+                color.set('#40E0D0'); // Turquoise
               } else if (height < 1) {
-                color.set('#90EE90'); // Verde claro
+                color.set('#90EE90'); // Light green
               } else if (height < 2) {
-                color.set('#32CD32'); // Verde
+                color.set('#32CD32'); // Green
               } else {
-                color.set('#228B22'); // Verde oscuro
+                color.set('#228B22'); // Dark green
               }
               
               color.toArray(colors, i * 3);
@@ -86,36 +84,35 @@ const PointCloudViewer: React.FC<PointCloudProps> = ({
             setPoints(positions);
             setColors(colors);
             setIsLoading(false);
-            console.log("Nube de puntos simulada generada con éxito");
+            console.log("Simulated point cloud generated successfully");
           }, 1000);
         })
         .catch(error => {
-          console.error("Error al cargar el archivo LAS:", error);
+          console.error("Error loading LAS file:", error);
           setError(error.message);
           setIsLoading(false);
         });
     } else {
-      // Si no hay URL, mostramos la nube de puntos de demostración
-      console.log("No hay URL, mostrando nube de puntos de demostración");
+      // If there's no URL, show the demo point cloud
       setPoints(null);
       setColors(null);
     }
   }, [url]);
 
-  // Si hay un error o está cargando, mostramos un mensaje
+  // If there's an error or it's loading, show a message
   if (error) {
-    console.error("Error en PointCloudViewer:", error);
-    return <DemoPointCloud color="red" size={size} opacity={opacity} />;
+    console.error("Error in PointCloudViewer:", error);
+    return <DemoPointCloud color="red" size={size} opacity={opacity} pointCount={pointCount} />;
   }
 
   if (isLoading || !url) {
-    return url ? <LoadingIndicator /> : <DemoPointCloud color={color} size={size} opacity={opacity} />;
+    return url ? <LoadingIndicator /> : <DemoPointCloud color={color} size={size} opacity={opacity} pointCount={pointCount} />;
   }
 
-  // Si tenemos puntos, los mostramos
+  // If we have points, show them
   if (points && colors) {
     return (
-      <Points ref={pointsRef}>
+      <Points>
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
@@ -142,25 +139,30 @@ const PointCloudViewer: React.FC<PointCloudProps> = ({
     );
   }
 
-  // Si no hay datos, mostramos la nube de puntos de demostración
-  return <DemoPointCloud color={color} size={size} opacity={opacity} />;
+  // If there's no data, show the demo point cloud
+  return <DemoPointCloud color={color} size={size} opacity={opacity} pointCount={pointCount} />;
 };
 
-// Componente para la nube de puntos de demostración
-const DemoPointCloud = ({ color = '#4f46e5', size = 0.03, opacity = 0.8 }: Omit<PointCloudProps, 'url'>) => {
-  // Generamos una nube de puntos más detallada con 15000 puntos
-  const count = 15000;
+// Component for the demo point cloud
+const DemoPointCloud = ({ 
+  color = '#4f46e5', 
+  size = 0.03, 
+  opacity = 0.8,
+  pointCount = 15000
+}: Omit<PointCloudProps, 'url'> & { pointCount?: number }) => {
+  // Generate a more detailed point cloud with 15000 points
+  const count = pointCount;
   const [hovered, setHovered] = useState(false);
   
   const positions = useMemo(() => {
     const positions = new Float32Array(count * 3);
     
     for (let i = 0; i < count; i++) {
-      // Creamos una nube de puntos con forma de terreno
-      const r = Math.sqrt(Math.random()) * 5; // Distribución de raíz cuadrada para mayor densidad en el centro
+      // Create a point cloud with terrain shape
+      const r = Math.sqrt(Math.random()) * 5; // Square root distribution for higher density in center
       const theta = Math.random() * 2 * Math.PI;
       
-      // Creamos características de terreno con ondas sinusoidales
+      // Create terrain features with sinusoidal waves
       const baseHeight = Math.sin(r * 0.5) * Math.cos(theta * 2) * 1.5;
       const noise = (Math.random() - 0.5) * 0.5;
       const height = baseHeight + noise;
@@ -173,30 +175,30 @@ const DemoPointCloud = ({ color = '#4f46e5', size = 0.03, opacity = 0.8 }: Omit<
     return positions;
   }, [count]);
   
-  // Generamos colores basados en la altura para mejor visualización
+  // Generate colors based on height for better visualization
   const colors = useMemo(() => {
     const colors = new Float32Array(count * 3);
     const color = new THREE.Color();
     
     for (let i = 0; i < count; i++) {
-      // Obtenemos la posición Y (altura)
+      // Get Y position (height)
       const height = positions[i * 3 + 1];
       
-      // Color basado en altura
+      // Color based on height
       if (height < -0.5) {
-        // Azul para puntos bajos
+        // Blue for low points
         color.set('#1e40af');
       } else if (height < 0) {
-        // Verde azulado para puntos medio-bajos
+        // Blue-green for medium-low points
         color.set('#0d9488');
       } else if (height < 0.5) {
-        // Verde para puntos medios
+        // Green for medium points
         color.set('#16a34a');
       } else if (height < 1) {
-        // Amarillo para puntos medio-altos
+        // Yellow for medium-high points
         color.set('#ca8a04');
       } else {
-        // Rojo para puntos altos
+        // Red for high points
         color.set('#dc2626');
       }
       
@@ -237,7 +239,7 @@ const DemoPointCloud = ({ color = '#4f46e5', size = 0.03, opacity = 0.8 }: Omit<
   );
 };
 
-// Indicador de carga para cuando estamos procesando un archivo
+// Loading indicator for when we're processing a file
 const LoadingIndicator = () => {
   const [rotation, setRotation] = useState(0);
   
