@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from "@/components/ui/menubar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -21,7 +21,7 @@ import {
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import PointCloudViewer from "@/components/PointCloudViewer";
 import ViewerContainer, { HtmlOverlay } from "@/components/ViewerContainer";
 
@@ -29,7 +29,7 @@ import ViewerContainer, { HtmlOverlay } from "@/components/ViewerContainer";
 interface FileData {
   fileType: 'ifc' | 'las';
   fileName: string;
-  fileSize: number;
+  fileSize?: number;
   fileUrl?: string;
   visible?: boolean;
   id?: string;
@@ -45,11 +45,25 @@ const Viewer = () => {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [visibleFiles, setVisibleFiles] = useState<{[key: string]: boolean}>({});
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   
   // Extract files from location state
   const state = location.state || {};
   const [files, setFiles] = useState<FileData[]>(() => {
+    console.log("Initial state:", state);
     const initialFiles = state.files || [];
+    
+    // Add a single file if no files array but fileType exists
+    if (initialFiles.length === 0 && state.fileType) {
+      return [{
+        fileType: state.fileType,
+        fileName: state.fileName || 'Unknown file',
+        fileUrl: state.fileUrl || undefined,
+        id: `${state.fileName || 'file'}-${Date.now() + Math.random() * 1000}`,
+        visible: true
+      }];
+    }
+    
     // Add IDs and visibility to files
     return initialFiles.map((file: FileData) => ({
       ...file,
@@ -73,6 +87,8 @@ const Viewer = () => {
       }
     });
     setVisibleFiles(initialVisibility);
+    
+    console.log("Files initialized:", files);
   }, []);
   
   // If no files and not in demo mode, redirect to the main page
@@ -108,7 +124,7 @@ const Viewer = () => {
     try {
       console.log("Initializing IFC viewer for:", fileData.fileName);
       
-      // Create the viewer with ThatOpen enhancements
+      // Create the viewer with enhanced settings
       const viewer = new IfcViewerAPI({
         container: containerRef.current,
         backgroundColor: new THREE.Color(0x222222)
@@ -130,13 +146,35 @@ const Viewer = () => {
       axesHelper.position.set(0, 0.1, 0);
       viewer.context.getScene().add(axesHelper);
       
+      // Add better lighting for IFC models
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      viewer.context.getScene().add(ambientLight);
+      
+      const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight1.position.set(5, 10, 7);
+      viewer.context.getScene().add(directionalLight1);
+      
+      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+      directionalLight2.position.set(-5, 5, -5);
+      viewer.context.getScene().add(directionalLight2);
+      
+      // Add a reference cube at origin to make sure the scene is rendering
+      const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      const material = new THREE.MeshStandardMaterial({ 
+        color: 0xff0000, 
+        wireframe: true 
+      });
+      const cube = new THREE.Mesh(geometry, material);
+      cube.position.set(0, 0.3, 0);
+      viewer.context.getScene().add(cube);
+      
       // Load all IFC models
-      for (const file of files.filter(f => f.fileType === 'ifc' && f.fileUrl)) {
+      for (const file of files.filter(f => f.fileType === 'ifc')) {
         try {
           console.log(`Loading IFC model: ${file.fileName} from URL: ${file.fileUrl}`);
           
-          // Use loadIfcUrl with the file's URL
           if (file.fileUrl) {
+            // Try loading the file - this might fail if URL is invalid or CORS issues
             const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
             
             // Store reference to the model
@@ -150,9 +188,38 @@ const Viewer = () => {
             setTimeout(() => {
               viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
             }, 500);
+            
+            toast({
+              title: "Model loaded",
+              description: `Successfully loaded ${file.fileName}`,
+            });
+          } else {
+            console.warn(`No URL provided for file: ${file.fileName}`);
+            // Use example model if no URL is provided
+            const exampleUrl = "https://examples.ifcjs.io/models/ifc/SametLibrary.ifc";
+            console.log(`Using example IFC model from: ${exampleUrl}`);
+            
+            toast({
+              title: "Loading example",
+              description: "No file URL provided, loading example model",
+            });
+            
+            try {
+              const model = await viewer.IFC.loadIfcUrl(exampleUrl);
+              console.log("Example IFC model loaded successfully");
+              
+              // Fit to model after loading
+              setTimeout(() => {
+                viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+              }, 500);
+            } catch (e) {
+              console.error("Error loading example model:", e);
+              setLoadingError("Could not load example model. Check network connection.");
+            }
           }
         } catch (e) {
           console.error(`Error loading IFC model ${file.fileName}:`, e);
+          setLoadingError(`Error loading model ${file.fileName}. The file might be corrupted or inaccessible.`);
           toast({
             variant: "destructive",
             title: `Error loading ${file.fileName}`,
@@ -162,6 +229,7 @@ const Viewer = () => {
       }
     } catch (e) {
       console.error("Error initializing IFC viewer:", e);
+      setLoadingError("Failed to initialize the viewer. Please try again.");
       toast({
         variant: "destructive",
         title: "Viewer initialization failed",
@@ -235,6 +303,30 @@ const Viewer = () => {
   useEffect(() => {
     frameAllRef.current = frameAll;
   }, []);
+  
+  // Add debugging function
+  const debugViewer = () => {
+    if (viewerRef.current) {
+      console.log("IFC Viewer:", viewerRef.current);
+      console.log("Scene:", viewerRef.current.context.getScene());
+      console.log("Models:", modelRefs.current);
+      
+      // Add a sphere at origin to confirm rendering
+      const geometry = new THREE.SphereGeometry(0.3, 32, 32);
+      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+      const sphere = new THREE.Mesh(geometry, material);
+      sphere.position.set(0, 0, 0);
+      viewerRef.current.context.getScene().add(sphere);
+      
+      toast({
+        title: "Debug info",
+        description: "Check console for viewer information"
+      });
+    } else {
+      console.log("Viewer not initialized");
+      console.log("Files:", files);
+    }
+  };
 
   const goBack = () => {
     navigate('/');
@@ -315,6 +407,11 @@ const Viewer = () => {
         </div>
         
         <div className="flex items-center space-x-1">
+          {process.env.NODE_ENV === 'development' && (
+            <Button variant="ghost" size="icon" onClick={debugViewer} className="text-white hover:bg-[#444444]">
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={goBack} className="text-white hover:bg-[#444444]">
             <X className="h-4 w-4" />
           </Button>
@@ -335,6 +432,18 @@ const Viewer = () => {
               className="w-full h-full"
             >
               {/* IFC Viewer will be initialized here */}
+              
+              {/* Show error message if loading failed */}
+              {loadingError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+                  <div className="bg-card p-6 rounded-lg max-w-md text-center">
+                    <div className="text-red-500 text-4xl mb-4">⚠️</div>
+                    <h3 className="text-xl font-medium mb-2">Error Loading Model</h3>
+                    <p className="text-muted-foreground mb-4">{loadingError}</p>
+                    <Button onClick={goBack}>Return to Upload</Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
@@ -395,30 +504,30 @@ const Viewer = () => {
           <div className="absolute top-4 right-4 flex flex-col space-y-2 pointer-events-auto">
             <Button 
               onClick={frameAll}
-              variant="viewer" 
+              variant="secondary" 
               size="icon"
               title="Frame all objects"
-              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
+              className="bg-[#333333] text-white hover:bg-[#444444] border border-[#444444]"
             >
               <Move className="h-5 w-5" />
             </Button>
             
             <Button 
               onClick={toggleFullscreen}
-              variant="viewer" 
+              variant="secondary" 
               size="icon"
               title="Toggle fullscreen"
-              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
+              className="bg-[#333333] text-white hover:bg-[#444444] border border-[#444444]"
             >
               {isFullscreen ? <MinimizeIcon className="h-5 w-5" /> : <MaximizeIcon className="h-5 w-5" />}
             </Button>
             
             <Button 
               onClick={toggleStats}
-              variant="viewer" 
+              variant="secondary" 
               size="icon"
               title="Toggle performance stats"
-              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
+              className="bg-[#333333] text-white hover:bg-[#444444] border border-[#444444]"
             >
               <Settings className="h-5 w-5" />
             </Button>

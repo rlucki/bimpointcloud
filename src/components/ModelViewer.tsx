@@ -18,12 +18,14 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const viewerRef = useRef<IfcViewerAPI | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loadingModel, setLoadingModel] = useState(true);
   const [viewerInitialized, setViewerInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   useEffect(() => {
     // Log info for debugging
@@ -36,6 +38,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
 
     setLoadingModel(true);
     setError(null);
+    setModelLoaded(false);
 
     if (fileType === 'ifc') {
       // Initialize IFC viewer when component mounts
@@ -50,11 +53,11 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           // Create the viewer
           viewer = new IfcViewerAPI({
             container: containerRef.current,
-            backgroundColor: new THREE.Color(0xf0f4ff)
+            backgroundColor: new THREE.Color(0x222222)
           });
           
-          // Center the model at 0,0,0
-          viewer.context.getScene().position.set(0, 0, 0);
+          // Store viewer reference
+          viewerRef.current = viewer;
           
           // Set up camera
           viewer.context.ifcCamera.cameraControls.setPosition(5, 5, 5);
@@ -63,26 +66,64 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           setViewerInitialized(true);
           
           // Add grid for better spatial reference
-          const grid = new THREE.GridHelper(50, 50);
+          const grid = new THREE.GridHelper(50, 50, 0xffffff, 0x888888);
           viewer.context.getScene().add(grid);
           
           // Add axes helper
           const axesHelper = new THREE.AxesHelper(5);
           viewer.context.getScene().add(axesHelper);
           
-          // The next step would be to load an IFC file from a URL
-          // For now, we'll show a message in the viewer
-          const geometry = new THREE.BoxGeometry(2, 2, 2);
-          const material = new THREE.MeshBasicMaterial({ color: 0x4f46e5, wireframe: true });
-          const cube = new THREE.Mesh(geometry, material);
-          cube.position.set(0, 1, 0);
-          viewer.context.getScene().add(cube);
+          // Add lighting for better visibility
+          const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+          viewer.context.getScene().add(ambientLight);
           
-          // Add a text label
-          const textDiv = document.createElement('div');
-          textDiv.className = 'absolute bottom-4 left-4 bg-background/80 p-2 rounded text-sm';
-          textDiv.textContent = fileName ? `File: ${fileName}` : 'No file loaded';
-          containerRef.current.appendChild(textDiv);
+          const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+          directionalLight.position.set(5, 10, 3);
+          viewer.context.getScene().add(directionalLight);
+          
+          // Try to load the IFC file if URL is provided
+          if (fileUrl) {
+            try {
+              console.log("Loading IFC model from URL:", fileUrl);
+              const model = await viewer.IFC.loadIfcUrl(fileUrl);
+              console.log("IFC model loaded successfully:", model);
+              
+              // Fit to model after loading
+              setTimeout(() => {
+                viewer?.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+              }, 500);
+              
+              setModelLoaded(true);
+              
+              toast({
+                title: "Model Loaded",
+                description: `Successfully loaded ${fileName}`,
+              });
+            } catch (e) {
+              console.error("Error loading IFC model:", e);
+              setError("Failed to load IFC model. The file might be corrupted or in an unsupported format.");
+              
+              // Add a demo cube to show that the viewer is working
+              const geometry = new THREE.BoxGeometry(2, 2, 2);
+              const material = new THREE.MeshStandardMaterial({ 
+                color: 0x4f46e5, 
+                wireframe: true 
+              });
+              const cube = new THREE.Mesh(geometry, material);
+              cube.position.set(0, 1, 0);
+              viewer.context.getScene().add(cube);
+            }
+          } else {
+            // If no URL, add a demo cube
+            const geometry = new THREE.BoxGeometry(2, 2, 2);
+            const material = new THREE.MeshStandardMaterial({ 
+              color: 0x4f46e5, 
+              wireframe: true 
+            });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(0, 1, 0);
+            viewer.context.getScene().add(cube);
+          }
           
           setLoadingModel(false);
           toast({
@@ -129,13 +170,13 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             
             // Background gradient
             const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, '#f0f4ff');
-            gradient.addColorStop(1, '#e0e7ff');
+            gradient.addColorStop(0, '#222222');
+            gradient.addColorStop(1, '#333333');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Grid for better spatial reference
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
             ctx.lineWidth = 1;
             
             // Draw vertical grid lines
@@ -194,7 +235,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             }
             
             // Add coordinate labels
-            ctx.fillStyle = '#1e293b';
+            ctx.fillStyle = '#ffffff';
             ctx.font = '12px sans-serif';
             ctx.textAlign = 'center';
             
@@ -218,7 +259,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
       
       return () => clearTimeout(loadTimeout);
     }
-  }, [fileType, fileName, toast]);
+  }, [fileType, fileName, fileUrl, toast]);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -293,6 +334,27 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
+  // Debugging function to show model status
+  const debug = () => {
+    if (viewerRef.current) {
+      console.log("Viewer state:", viewerRef.current);
+      console.log("Scene:", viewerRef.current.context.getScene());
+      console.log("Camera position:", viewerRef.current.context.ifcCamera.cameraControls.getPosition());
+      console.log("Model loaded:", modelLoaded);
+      
+      // Add a visible marker at origin for debugging
+      const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+      const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const sphere = new THREE.Mesh(geometry, material);
+      sphere.position.set(0, 0, 0);
+      viewerRef.current.context.getScene().add(sphere);
+      toast({
+        title: "Debug info",
+        description: "Check console for viewer state",
+      });
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -302,17 +364,22 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         </Button>
         <h2 className="text-2xl font-semibold">3D Model Viewer</h2>
         
-        <Button variant="outline" onClick={openFileDialog} className="flex items-center gap-1">
-          <Box className="h-4 w-4" /> 
-          Open File
-          <input 
-            ref={fileInputRef}
-            type="file"
-            accept=".ifc,.las"
-            onChange={handleFileInputChange}
-            className="hidden"
-          />
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openFileDialog} className="flex items-center gap-1">
+            <Box className="h-4 w-4" /> 
+            Open File
+            <input 
+              ref={fileInputRef}
+              type="file"
+              accept=".ifc,.las"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+          </Button>
+          {process.env.NODE_ENV !== 'production' && (
+            <Button variant="ghost" onClick={debug}>Debug</Button>
+          )}
+        </div>
       </div>
       
       <Card 
@@ -349,7 +416,21 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
                 </div>
               </div>
             )}
-            {/* IFC Viewer will be initialized here */}
+            
+            {/* Status indicator */}
+            <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-2 rounded-md text-sm">
+              {modelLoaded ? (
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                  Model loaded: {fileName}
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div>
+                  Viewer ready - No model loaded
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="p-4 relative">
