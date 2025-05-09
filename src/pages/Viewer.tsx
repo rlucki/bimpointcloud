@@ -137,6 +137,11 @@ const Viewer = () => {
       
       viewerRef.current = viewer;
       
+      // Set WASM path with dynamic base URL
+      const wasmPath = import.meta.env.BASE_URL.replace(/\/$/, '') + '/wasm/';
+      console.log("Setting WASM path to:", wasmPath);
+      await viewer.IFC.setWasmPath(wasmPath);
+      
       // Set up camera
       viewer.context.ifcCamera.cameraControls.setPosition(10, 10, 10);
       viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
@@ -179,10 +184,6 @@ const Viewer = () => {
           console.log(`Loading IFC model: ${file.fileName} from URL: ${file.fileUrl}`);
           
           if (file.fileUrl) {
-            // IMPORTANT: Set the WebAssembly path first - crucial for the IFC parser
-            await viewer.IFC.setWasmPath("/wasm/");
-            console.log("WASM path set for IFC parser");
-            
             // Try loading the file
             const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
             
@@ -431,6 +432,13 @@ const Viewer = () => {
     ? `3D Viewer - ${files.length} file(s)` 
     : "3D Viewer - Demo Mode";
   
+  // Get the current hook instance for the IFC viewer
+  const currentViewer = useIFCViewer(
+    containerRef,
+    files.length > 0 && files[0].fileUrl ? files[0].fileUrl : undefined,
+    files.length > 0 ? files[0].fileName : null
+  );
+  
   return (
     <ViewerLayout
       title={viewerTitle}
@@ -442,6 +450,10 @@ const Viewer = () => {
       viewer={viewerRef.current}
       fileUrl={currentFileUrl}
       fileName={currentFileName}
+      // Pass diagnostic status
+      wasmLoaded={currentViewer.wasmLoaded}
+      modelLoaded={currentViewer.modelLoaded}
+      meshExists={currentViewer.meshExists}
     >
       {/* Main Viewer Area */}
       <div className="flex-1 relative">
