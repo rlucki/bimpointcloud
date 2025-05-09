@@ -239,7 +239,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
             description: meshExists ? 
               `Successfully loaded ${fileName || 'model'} with geometry` :
               `Model ${fileName || 'file'} loaded but no 3D geometry found`,
-            variant: meshExists ? "default" : "secondary",
+            variant: "default",
           });
           
         } catch (loadError) {
@@ -323,15 +323,19 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       // Get model by ID from the IFC manager
       try {
         // Log all modelIDs to help debug
-        const allIds = Object.keys(viewerRef.current.IFC.context.items.ifcModels || {});
-        console.log("All IFC model IDs:", allIds);
+        console.log("IfcModels:", viewerRef.current.IFC);
         
         // Try to get the first model ID
         if (modelRef.current && modelRef.current.modelID !== undefined) {
           const modelID = modelRef.current.modelID;
           console.log(`Attempting to get model with ID: ${modelID}`);
-          const ifcModel = viewerRef.current.IFC.getIfcModel(modelID);
-          console.log("IFC model by ID:", ifcModel);
+          // The error occurred here - we need to check if this method exists first
+          if (typeof viewerRef.current.IFC.getIfcModel === 'function') {
+            const ifcModel = viewerRef.current.IFC.getIfcModel(modelID);
+            console.log("IFC model by ID:", ifcModel);
+          } else {
+            console.log("getIfcModel method is not available in this version");
+          }
         }
       } catch (e) {
         console.error("Error getting model by ID:", e);
