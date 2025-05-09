@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,7 +122,7 @@ const FileUploader: React.FC = () => {
     // Find the first successful file
     const successFile = files.find((file) => file.status === "success");
     
-    if (successFile) {
+    if (successFile && successFile.name) {
       const fileExtension = successFile.name.split('.').pop()?.toLowerCase();
       const fileType = fileExtension === 'ifc' ? 'ifc' : fileExtension === 'las' ? 'las' : null;
       

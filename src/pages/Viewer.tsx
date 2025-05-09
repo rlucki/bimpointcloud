@@ -1,11 +1,16 @@
 
 import React from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Navigate } from "react-router-dom";
 import ModelViewer from "@/components/ModelViewer";
 
 const Viewer = () => {
   const location = useLocation();
   const { fileType, fileName } = location.state || { fileType: null, fileName: null };
+  
+  // Si no hay state, redirigir a la página principal
+  if (!location.state) {
+    return <Navigate to="/" />;
+  }
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-secondary/30 py-10 px-4">
