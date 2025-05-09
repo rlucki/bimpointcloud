@@ -357,6 +357,19 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
+  // Modified handleFrameAll function to accept an optional parameter
+  const handleFrameAll = (target?: THREE.Object3D) => {
+    if (viewerRef.current) {
+      try {
+        // Default behavior for framing all objects
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(viewerRef.current.context.getScene(), true);
+        console.log("Framed all objects");
+      } catch (e) {
+        console.error("Error framing objects:", e);
+      }
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-6">
