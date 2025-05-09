@@ -29,7 +29,7 @@ import { handleFrameAll as utilsHandleFrameAll, debugViewer } from "@/components
 import ViewerSidebar from "@/components/viewer/ViewerSidebar";
 import ViewerControls from "@/components/viewer/ViewerControls";
 import ViewerLayout from "@/components/viewer/ViewerLayout";
-import { useIFCViewer } from "@/hooks/useIFCViewer"; // Add the import for useIFCViewer hook
+import { useIFCViewer } from "@/hooks/useIFCViewer";
 
 // Type definitions for the file data
 interface FileData {
@@ -83,6 +83,22 @@ const Viewer = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
   const modelRefs = useRef<{[key: string]: any}>({});
+  
+  // Get current file URL and name - extract outside conditional rendering
+  const currentFileUrl = files.length > 0 && files[0].fileUrl ? files[0].fileUrl : undefined;
+  const currentFileName = files.length > 0 ? files[0].fileName : null;
+  
+  // IMPORTANT: Always call hooks unconditionally at the top level
+  // This fixes the "Rendered more hooks than during the previous render" error
+  const { 
+    viewer: ifcViewer,
+    mesh,
+    wasmLoaded,
+    modelLoaded,
+    meshExists,
+    debug,
+    frameAll
+  } = useIFCViewer(containerRef, currentFileUrl, currentFileName);
   
   // Initialize visibility state for files
   useEffect(() => {
@@ -383,17 +399,10 @@ const Viewer = () => {
     frameAllRef.current();
   };
 
-  const frameAll = () => {
-    // If using IFC Viewer
-    if (viewerRef.current) {
-      utilsHandleFrameAll(viewerRef);
-    }
-  };
-
   // Store frame all function in ref for access from outside Canvas
   useEffect(() => {
     frameAllRef.current = frameAll;
-  }, []);
+  }, [frameAll]);
   
   // Use the improved debug viewer utility
   const handleDebug = () => {
@@ -424,44 +433,26 @@ const Viewer = () => {
     );
   }
   
-  // Get current file URL if available
-  const currentFileUrl = files.length > 0 && files[0].fileUrl ? files[0].fileUrl : undefined;
-  const currentFileName = files.length > 0 ? files[0].fileName : null;
-  
   // Determine the title based on files
   const viewerTitle = files.length > 0 
     ? `3D Viewer - ${files.length} file(s)` 
     : "3D Viewer - Demo Mode";
-  
-  // Get the current hook instance for the IFC viewer
-  const currentViewer = useIFCViewer(
-    containerRef,
-    files.length > 0 && files[0].fileUrl ? files[0].fileUrl : undefined,
-    files.length > 0 ? files[0].fileName : null
-  );
   
   return (
     <ViewerLayout
       title={viewerTitle}
       onClose={() => navigate('/')}
       onToggleFullscreen={toggleFullscreen}
-      onDebug={() => {
-        if (viewerRef.current) {
-          debugViewer(viewerRef, toast);
-        } else {
-          console.log("Viewer not initialized");
-          console.log("Files:", files);
-        }
-      }}
+      onDebug={debug} // Use debug from useIFCViewer hook
       isFullscreen={isFullscreen}
       files={files}
-      viewer={viewerRef.current || currentViewer.viewer}
+      viewer={viewerRef.current || ifcViewer} // Use the viewer from the hook if viewerRef isn't set
       fileUrl={currentFileUrl}
       fileName={currentFileName}
       // Pass diagnostic status
-      wasmLoaded={currentViewer.wasmLoaded}
-      modelLoaded={currentViewer.modelLoaded}
-      meshExists={currentViewer.meshExists}
+      wasmLoaded={wasmLoaded}
+      modelLoaded={modelLoaded}
+      meshExists={meshExists}
     >
       {/* Main Viewer Area */}
       <div className="flex-1 relative">
