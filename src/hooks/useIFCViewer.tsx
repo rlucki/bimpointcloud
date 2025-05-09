@@ -1,8 +1,8 @@
-
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
 import { useToast } from "@/components/ui/use-toast";
+import { frameIFCModel } from "@/components/viewer/ViewerUtils";
 
 interface UseIFCViewerProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -98,22 +98,12 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         
         modelRef.current = model;
         
+        // Wait for the IFC parser to completely finish
+        await viewer.IFC.loader.ifcManager.whenAllDone();
+        
         if (model && model.mesh) {
-          // 1) Calcular la caja envolvente del mesh
-          const bbox = new THREE.Box3().setFromObject(model.mesh);
-          
-          // 2) Extraer el centro y la esfera envolvente
-          const center = bbox.getCenter(new THREE.Vector3());
-          const sphere = bbox.getBoundingSphere(new THREE.Sphere()); // Passing a new Sphere as argument
-          
-          // 3) Encuadrar la cámara al centro y ajustarla para que quepa todo
-          viewer.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);
-          viewer.context.ifcCamera.cameraControls.fitToSphere(sphere, true);
-          
-          console.log("Modelo encuadrado usando bounding box:", {
-            center: center.toArray(),
-            radius: sphere.radius
-          });
+          // Frame the model using our new utility function that follows best practices
+          await frameIFCModel(viewerRef, model.mesh);
         }
         
         setModelLoaded(true);
@@ -154,19 +144,16 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     };
   }, [containerRef, fileUrl, fileName, toast]);
   
-  // Frame all objects in view
-  const frameAll = () => {
+  // Frame all objects in view using the improved method
+  const frameAll = async () => {
     if (viewerRef.current) {
       try {
         if (modelRef.current && modelRef.current.mesh) {
-          // Si tenemos un modelo cargado, calculamos su bounding box
-          const bbox = new THREE.Box3().setFromObject(modelRef.current.mesh);
-          const center = bbox.getCenter(new THREE.Vector3());
-          const sphere = bbox.getBoundingSphere(new THREE.Sphere()); // Passing a new Sphere as argument
+          // Wait for the parser to finish if needed
+          await viewerRef.current.IFC.loader.ifcManager.whenAllDone();
           
-          // Encuadramos usando la esfera calculada
-          viewerRef.current.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);
-          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(sphere, true);
+          // Use our improved framing utility
+          await frameIFCModel(viewerRef, modelRef.current.mesh);
         } else {
           // Otherwise frame the whole scene
           const scene = viewerRef.current.context.getScene();
