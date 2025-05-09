@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -281,7 +280,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   };
 
-  // FIX: Modified handleFrameAll function to always provide the required first argument
+  // FIXED: Modified handleFrameAll function to correctly handle the bounding sphere for any 3D object
   const handleFrameAll = (target?: THREE.Object3D) => {
     if (viewerRef.current) {
       try {
@@ -289,15 +288,44 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           // If a specific target is provided, frame that object
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(target, true);
         } else {
-          // Get the scene to pass as the required first argument
+          // Find objects in the scene to frame
           const scene = viewerRef.current.context.getScene();
           
-          // FIXED: Always pass an object as the first argument to fitToSphere
-          if (scene) {
+          if (scene && scene.children.length > 0) {
+            // Create a bounding box that encompasses all objects
+            const boundingBox = new THREE.Box3();
+            
+            // Add all visible meshes to the bounding box calculation
+            scene.traverse((object) => {
+              if (object.visible && (object instanceof THREE.Mesh || object instanceof THREE.Group)) {
+                boundingBox.expandByObject(object);
+              }
+            });
+            
+            // Only proceed if we found valid objects
+            if (!boundingBox.isEmpty()) {
+              // Create a sphere from the bounding box
+              const boundingSphere = new THREE.Sphere();
+              boundingBox.getBoundingSphere(boundingSphere);
+              
+              // Create a dummy object at the center of the bounding sphere
+              const dummyObject = new THREE.Object3D();
+              dummyObject.position.copy(boundingSphere.center);
+              
+              // Use the dummy object as the target for fitToSphere
+              viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(dummyObject, true);
+              console.log("Framed all objects using bounding sphere");
+            } else {
+              // Fallback: frame the entire scene if bounding box is empty
+              viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
+              console.log("Framed scene (fallback)");
+            }
+          } else if (scene) {
+            // If scene exists but has no children, frame the scene itself
             viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
+            console.log("Framed empty scene");
           }
         }
-        console.log("Framed objects");
       } catch (e) {
         console.error("Error framing objects:", e);
       }
