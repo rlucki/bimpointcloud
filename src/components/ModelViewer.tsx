@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Box, Info } from "lucide-react";
+import { ArrowLeft, Box, Eye, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -11,28 +11,26 @@ import { IfcViewerAPI } from "web-ifc-viewer";
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;
   fileName: string | null;
-  fileUrl?: string; // Added fileUrl prop
+  fileUrl?: string;
 }
 
 const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loadingModel, setLoadingModel] = useState(true);
   const [viewerInitialized, setViewerInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     // Log info for debugging
     console.log("ModelViewer received:", { fileType, fileName, fileUrl });
     
-    if (!fileType || !fileName) {
-      toast({
-        variant: "destructive",
-        title: "No model to display",
-        description: "Please upload an IFC or LAS file first.",
-      });
+    if (!fileType && !fileName) {
+      setLoadingModel(false);
       return;
     }
 
@@ -82,8 +80,8 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           
           // Add a text label
           const textDiv = document.createElement('div');
-          textDiv.className = 'absolute bottom-4 left-4 bg-white p-2 rounded text-sm';
-          textDiv.textContent = `Ready to load: ${fileName}`;
+          textDiv.className = 'absolute bottom-4 left-4 bg-background/80 p-2 rounded text-sm';
+          textDiv.textContent = fileName ? `File: ${fileName}` : 'No file loaded';
           containerRef.current.appendChild(textDiv);
           
           setLoadingModel(false);
@@ -213,7 +211,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             ctx.fillText("Origin (0,0,0)", centerX, centerY + 20);
             
             // Add a file info label
-            ctx.fillText(`File: ${fileName}`, centerX, 40);
+            ctx.fillText(fileName ? `File: ${fileName}` : 'No file loaded', centerX, 40);
           }
         }
       }, 800);
@@ -222,8 +220,77 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     }
   }, [fileType, fileName, toast]);
 
-  const handleViewIn3D = () => {
-    navigate('/viewer', { state: { fileType, fileName, fileUrl } });
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileSelected(files[0]);
+    }
+  };
+
+  const handleFileSelected = (file: File) => {
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (fileExtension === 'ifc' || fileExtension === 'las') {
+      // Process file
+      toast({
+        title: "File received",
+        description: `Processing ${file.name}...`,
+      });
+      
+      // In a real implementation, we would load this file into the viewer
+      // For now, we'll just set the file info and reload the viewer
+      const newFileType = fileExtension as "ifc" | "las";
+      navigate('/viewer', { 
+        state: { 
+          fileType: newFileType, 
+          fileName: file.name,
+        }
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Unsupported file format",
+        description: "Please upload an IFC or LAS file.",
+      });
+    }
+  };
+
+  const openFileDialog = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileSelected(files[0]);
+    }
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -235,23 +302,27 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         </Button>
         <h2 className="text-2xl font-semibold">3D Model Viewer</h2>
         
-        <Button variant="outline" onClick={handleViewIn3D} className="flex items-center gap-1">
+        <Button variant="outline" onClick={openFileDialog} className="flex items-center gap-1">
           <Box className="h-4 w-4" /> 
-          Open Full Viewer
+          Open File
+          <input 
+            ref={fileInputRef}
+            type="file"
+            accept=".ifc,.las"
+            onChange={handleFileInputChange}
+            className="hidden"
+          />
         </Button>
       </div>
       
-      <Card className="relative overflow-hidden border bg-card shadow-md">
-        {(!fileType || !fileName) ? (
-          <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
-            <Box className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
-            <h3 className="text-xl font-medium mb-2">No Models Available</h3>
-            <p className="text-muted-foreground max-w-md mb-6">
-              Upload IFC or LAS files from the main page to visualize them in 3D.
-            </p>
-            <Button onClick={() => navigate('/')}>Go to Upload Page</Button>
-          </div>
-        ) : loadingModel ? (
+      <Card 
+        className={`relative overflow-hidden border shadow-md transition-all duration-300 ${isDragging ? 'border-primary bg-primary/5' : 'bg-card'}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {loadingModel ? (
           <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
             <h3 className="text-xl font-medium mb-2">Loading Model</h3>
@@ -270,16 +341,43 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
             className="w-full h-[600px] relative"
             style={{ visibility: viewerInitialized ? 'visible' : 'hidden' }}
           >
+            {isDragging && (
+              <div className="absolute inset-0 bg-primary/10 flex items-center justify-center z-10">
+                <div className="text-center p-6 bg-card rounded-lg shadow">
+                  <Eye className="mx-auto h-12 w-12 text-primary mb-2" />
+                  <p className="text-lg font-medium">Drop to load file</p>
+                </div>
+              </div>
+            )}
             {/* IFC Viewer will be initialized here */}
           </div>
         ) : (
-          <div className="p-4">
+          <div className="p-4 relative">
             <canvas
               ref={canvasRef}
               width={1000}
               height={600}
               className="w-full h-full rounded-md"
             ></canvas>
+            {isDragging && (
+              <div className="absolute inset-0 bg-primary/10 flex items-center justify-center z-10">
+                <div className="text-center p-6 bg-card rounded-lg shadow">
+                  <Eye className="mx-auto h-12 w-12 text-primary mb-2" />
+                  <p className="text-lg font-medium">Drop to load file</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!fileType && !fileName && !loadingModel && !error && (
+          <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
+            <Box className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
+            <h3 className="text-xl font-medium mb-2">Drag & Drop to View</h3>
+            <p className="text-muted-foreground max-w-md mb-6">
+              Drag and drop your IFC or LAS files here to visualize them, or click "Open File" above.
+            </p>
+            <Button onClick={openFileDialog}>Select File</Button>
           </div>
         )}
       </Card>
