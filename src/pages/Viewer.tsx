@@ -114,9 +114,9 @@ const Viewer = () => {
             // Fit the model in the view
             const ifcProject = await viewer.IFC.getSpatialStructure(model.modelID);
             
-            // Center view on the model
+            // Center view on the model - Fixed: changed number to boolean for first parameter
             setTimeout(() => {
-              viewer.context.ifcCamera.cameraControls.fitToSphere(false, 1.5);
+              viewer.context.ifcCamera.cameraControls.fitToSphere(true, 1.5);
               toast({
                 title: "IFC Model Loaded",
                 description: `${fileName} loaded successfully`
@@ -141,7 +141,8 @@ const Viewer = () => {
           // No file URL, so we'll show a placeholder
           console.log("No IFC file URL provided. Showing placeholder cube.");
           toast({
-            variant: "info",
+            // Fixed: changed "info" to "default"
+            variant: "default", 
             title: "Demo Mode",
             description: "No IFC file provided. Showing placeholder model."
           });
@@ -395,7 +396,8 @@ const Viewer = () => {
     if (fileType === 'ifc' && viewerRef.current) {
       // Reset IFC view to show the whole model
       try {
-        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(false, 1.5);
+        // Fixed: changed number to boolean for first parameter
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(true, 1.5);
         toast({
           title: "View Reset",
           description: "IFC model centered in view"
