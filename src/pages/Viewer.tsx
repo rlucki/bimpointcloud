@@ -14,7 +14,10 @@ import {
   ChevronRight,
   Eye,
   MinimizeIcon,
-  MaximizeIcon
+  MaximizeIcon,
+  Move,
+  ZoomIn,
+  Square
 } from "lucide-react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -27,11 +30,16 @@ const Viewer = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [viewerInitialized, setViewerInitialized] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<string | null>(null);
   
   // References for the viewer elements
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
+  const isDraggingRef = useRef(false);
+  const lastPosRef = useRef({ x: 0, y: 0 });
+  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [viewPosition, setViewPosition] = useState({ x: 0, y: 0 });
 
   // Extract state from location or provide defaults
   const state = location.state || {};
@@ -129,6 +137,50 @@ const Viewer = () => {
           }
         };
         
+        // Setup canvas interactions
+        const handleMouseDown = (e: MouseEvent) => {
+          isDraggingRef.current = true;
+          lastPosRef.current = { x: e.clientX, y: e.clientY };
+        };
+        
+        const handleMouseMove = (e: MouseEvent) => {
+          if (isDraggingRef.current) {
+            const dx = e.clientX - lastPosRef.current.x;
+            const dy = e.clientY - lastPosRef.current.y;
+            
+            setViewPosition(prev => ({
+              x: prev.x + dx / zoomLevel,
+              y: prev.y + dy / zoomLevel
+            }));
+            
+            lastPosRef.current = { x: e.clientX, y: e.clientY };
+            
+            // Re-render with new position
+            renderLasVisualization(ctx, canvas.width, canvas.height);
+          }
+        };
+        
+        const handleMouseUp = () => {
+          isDraggingRef.current = false;
+        };
+        
+        const handleWheel = (e: WheelEvent) => {
+          e.preventDefault();
+          const delta = e.deltaY > 0 ? -0.1 : 0.1;
+          const newZoom = Math.max(0.5, Math.min(5.0, zoomLevel + delta));
+          setZoomLevel(newZoom);
+          
+          // Re-render with new zoom
+          renderLasVisualization(ctx, canvas.width, canvas.height);
+        };
+        
+        // Add event listeners
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mouseleave', handleMouseUp);
+        canvas.addEventListener('wheel', handleWheel);
+        
         // Call resize immediately and on window resize
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
@@ -142,6 +194,11 @@ const Viewer = () => {
         
         return () => {
           window.removeEventListener('resize', resizeCanvas);
+          canvas.removeEventListener('mousedown', handleMouseDown);
+          canvas.removeEventListener('mousemove', handleMouseMove);
+          canvas.removeEventListener('mouseup', handleMouseUp);
+          canvas.removeEventListener('mouseleave', handleMouseUp);
+          canvas.removeEventListener('wheel', handleWheel);
         };
       }
     }
@@ -155,27 +212,28 @@ const Viewer = () => {
     ctx.fillStyle = '#222222';
     ctx.fillRect(0, 0, width, height);
     
+    const centerX = width / 2 + viewPosition.x * zoomLevel;
+    const centerY = height / 2 + viewPosition.y * zoomLevel;
+    
     // Grid
     ctx.strokeStyle = 'rgba(80, 80, 80, 0.3)';
     ctx.lineWidth = 1;
     
-    const gridSize = 50;
+    const gridSize = 50 * zoomLevel;
     const gridExtent = 2000;
-    const centerX = width / 2;
-    const centerY = height / 2;
     
     // Draw grid lines
-    for (let x = -gridExtent; x <= gridExtent; x += gridSize) {
+    for (let x = -gridExtent; x <= gridExtent; x += gridSize / zoomLevel) {
       ctx.beginPath();
-      ctx.moveTo(centerX + x, centerY - gridExtent);
-      ctx.lineTo(centerX + x, centerY + gridExtent);
+      ctx.moveTo(centerX + x * zoomLevel, centerY - gridExtent * zoomLevel);
+      ctx.lineTo(centerX + x * zoomLevel, centerY + gridExtent * zoomLevel);
       ctx.stroke();
     }
     
-    for (let y = -gridExtent; y <= gridExtent; y += gridSize) {
+    for (let y = -gridExtent; y <= gridExtent; y += gridSize / zoomLevel) {
       ctx.beginPath();
-      ctx.moveTo(centerX - gridExtent, centerY + y);
-      ctx.lineTo(centerX + gridExtent, centerY + y);
+      ctx.moveTo(centerX - gridExtent * zoomLevel, centerY + y * zoomLevel);
+      ctx.lineTo(centerX + gridExtent * zoomLevel, centerY + y * zoomLevel);
       ctx.stroke();
     }
     
@@ -185,42 +243,67 @@ const Viewer = () => {
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX + 100, centerY);
+    ctx.lineTo(centerX + 100 * zoomLevel, centerY);
     ctx.stroke();
     
     // Y axis (green)
     ctx.strokeStyle = '#33ff33';
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX, centerY - 100);
+    ctx.lineTo(centerX, centerY - 100 * zoomLevel);
     ctx.stroke();
     
     // Z axis (blue)
     ctx.strokeStyle = '#3333ff';
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX - 50, centerY + 50);
+    ctx.lineTo(centerX - 50 * zoomLevel, centerY + 50 * zoomLevel);
     ctx.stroke();
     
     // Axis labels
     ctx.fillStyle = '#ffffff';
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText("X", centerX + 110, centerY + 15);
-    ctx.fillText("Y", centerX - 15, centerY - 110);
-    ctx.fillText("Z", centerX - 60, centerY + 65);
+    ctx.fillText("X", centerX + 110 * zoomLevel, centerY + 15);
+    ctx.fillText("Y", centerX - 15, centerY - 110 * zoomLevel);
+    ctx.fillText("Z", centerX - 60 * zoomLevel, centerY + 65 * zoomLevel);
     ctx.fillText("(0,0,0)", centerX, centerY + 20);
     
     // Draw point cloud
     ctx.fillStyle = 'rgba(100, 149, 237, 0.7)';
-    const pointCount = 2000;
-    const spread = 300;
+    const pointCount = 15000; // Increased point count for better visualization
+    const spread = 300 * zoomLevel;
     
+    // Generate pseudo-random points but in a stable pattern to simulate a real point cloud
+    const seed = 12345;
+    const pseudoRandom = (i: number, offset: number = 0) => {
+      return (Math.sin(i * seed + offset) + 1) / 2;
+    };
+    
+    // Draw points in a disc-shaped pattern with varying densities
     for (let i = 0; i < pointCount; i++) {
-      const x = centerX + (Math.random() - 0.5) * spread;
-      const y = centerY + (Math.random() - 0.5) * spread;
-      const size = Math.random() * 2 + 1;
+      const angle = pseudoRandom(i, 100) * Math.PI * 2;
+      const radius = pseudoRandom(i, 200) * (spread / 1.5);
       
+      // X and Y coordinates in a disc pattern
+      const x = centerX + Math.cos(angle) * radius;
+      const y = centerY + Math.sin(angle) * radius;
+      
+      // Size depends on distance from center to simulate depth
+      const distanceFromCenter = Math.sqrt(
+        Math.pow((x - centerX) / zoomLevel, 2) + Math.pow((y - centerY) / zoomLevel, 2)
+      );
+      
+      // Color varies with distance
+      const intensity = Math.max(0, 1 - distanceFromCenter / (spread / zoomLevel));
+      const color = Math.floor(intensity * 255);
+      
+      // Smaller points in the distance, larger in the foreground
+      const size = intensity * 2.5 * zoomLevel;
+      
+      ctx.fillStyle = `rgba(${color}, ${Math.min(200, color + 50)}, 255, ${intensity * 0.8})`;
+      
+      // Draw point
       ctx.beginPath();
       ctx.arc(x, y, size, 0, Math.PI * 2);
       ctx.fill();
@@ -230,6 +313,15 @@ const Viewer = () => {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.fillText(`${fileName} (${fileSize ? (fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size'})`, width / 2, 30);
     ctx.fillText("Point cloud centered at origin (0,0,0)", width / 2, 55);
+
+    // Highlight selected item if any
+    if (selectedItem) {
+      ctx.fillStyle = 'rgba(255, 255, 0, 0.2)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = '#FFFF00';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(`Selected: ${selectedItem}`, width / 2, height - 20);
+    }
   };
   
   const toggleFullscreen = () => {
@@ -252,6 +344,64 @@ const Viewer = () => {
 
   const goBack = () => {
     navigate('/');
+  };
+  
+  const resetView = () => {
+    if (fileType === 'ifc' && viewerRef.current) {
+      // Reset IFC view to show the whole model
+      try {
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(true);
+        toast({
+          title: "View Reset",
+          description: "IFC model centered in view"
+        });
+      } catch (e) {
+        console.error("Error resetting view:", e);
+      }
+    } else if (fileType === 'las') {
+      // Reset LAS view
+      setZoomLevel(1.0);
+      setViewPosition({ x: 0, y: 0 });
+      
+      // Re-render with reset values
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+          renderLasVisualization(ctx, canvasRef.current.width, canvasRef.current.height);
+        }
+      }
+      
+      toast({
+        title: "View Reset",
+        description: "Point cloud centered in view"
+      });
+    }
+  };
+  
+  const expandModel = () => {
+    if (fileType === 'ifc' && viewerRef.current) {
+      toggleFullscreen();
+    } else if (fileType === 'las') {
+      toggleFullscreen();
+    }
+  };
+  
+  const selectModelItem = (itemName: string) => {
+    setSelectedItem(selectedItem === itemName ? null : itemName);
+    
+    toast({
+      title: selectedItem === itemName ? "Item Deselected" : "Item Selected",
+      description: selectedItem === itemName ? "Item deselected" : `Selected: ${itemName}`,
+    });
+    
+    // Re-render with selection if it's LAS
+    if (fileType === 'las' && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        renderLasVisualization(ctx, canvasRef.current.width, canvasRef.current.height);
+      }
+    }
+    // For IFC, we would highlight the selected component here
   };
   
   // Clean up viewer on unmount
@@ -377,35 +527,71 @@ const Viewer = () => {
                 <div>
                   <div className="py-1 px-2 text-[#ABABAB] text-xs font-medium">BUILDING STRUCTURE</div>
                   <ul className="text-[#CCCCCC] text-sm">
-                    <li className="py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center">
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ${selectedItem === 'Building' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Building')}
+                    >
                       <ChevronRight className="h-3 w-3 mr-1" /> Building
                     </li>
-                    <li className="py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2">
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Levels' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Levels')}
+                    >
                       <ChevronRight className="h-3 w-3 mr-1" /> Levels
                     </li>
-                    <li className="py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-4">
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-4 ${selectedItem === 'Level 1' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Level 1')}
+                    >
                       <span className="w-3 mr-1"></span> Level 1
                     </li>
-                    <li className="py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-4">
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-4 ${selectedItem === 'Level 2' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Level 2')}
+                    >
                       <span className="w-3 mr-1"></span> Level 2
                     </li>
-                    <li className="py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2">
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Elements' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Elements')}
+                    >
                       <ChevronRight className="h-3 w-3 mr-1" /> Elements
                     </li>
                   </ul>
                 </div>
               ) : (
-                <div className="text-[#CCCCCC] text-sm p-2">
-                  <p>LAS Point Cloud</p>
-                  <p className="text-xs text-gray-400 mt-2">File: {fileName}</p>
-                  <p className="text-xs text-gray-400 mt-1">Size: {fileSize ? (fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown'}</p>
-                  <p className="text-xs text-gray-400 mt-1">Location: Origin (0,0,0)</p>
+                <div>
+                  <div className="py-1 px-2 text-[#ABABAB] text-xs font-medium">POINT CLOUD STRUCTURE</div>
+                  <ul className="text-[#CCCCCC] text-sm">
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ${selectedItem === 'Full Cloud' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Full Cloud')}
+                    >
+                      <ChevronRight className="h-3 w-3 mr-1" /> Full Cloud
+                    </li>
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Sections' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Sections')}
+                    >
+                      <ChevronRight className="h-3 w-3 mr-1" /> Sections
+                    </li>
+                    <li 
+                      className={`py-1 px-2 rounded cursor-pointer hover:bg-[#444444] flex items-center ml-2 ${selectedItem === 'Classifications' ? 'bg-[#4f46e5] text-white' : ''}`}
+                      onClick={() => selectModelItem('Classifications')}
+                    >
+                      <ChevronRight className="h-3 w-3 mr-1" /> Classifications
+                    </li>
+                  </ul>
                 </div>
               )}
             </div>
-            <div className="p-2 border-t border-[#444444]">
-              <Button variant="outline" size="sm" className="w-full bg-[#444444] text-white border-[#555555] hover:bg-[#555555]">
+            <div className="p-2 border-t border-[#444444] space-y-2">
+              <Button variant="viewer" size="sm" className="w-full">
                 Properties
+              </Button>
+              <Button onClick={expandModel} variant="viewer" size="sm" className="w-full flex items-center">
+                <Square className="h-4 w-4" />
+                <span>View Fullscreen</span>
               </Button>
             </div>
           </aside>
@@ -446,9 +632,47 @@ const Viewer = () => {
                 <span className="text-xs bg-[#444444] px-2 py-1 rounded">{fileType?.toUpperCase()}</span>
               </div>
               <div className="text-xs text-gray-300 mt-1">
-                Position: Origin (0,0,0)
+                Position: Origin (0,0,0) {selectedItem ? `| Selected: ${selectedItem}` : ''}
               </div>
             </div>
+          </div>
+          
+          {/* Viewer Controls */}
+          <div className="absolute top-4 right-4 flex flex-col space-y-2">
+            <Button 
+              onClick={resetView}
+              variant="viewer" 
+              size="icon"
+              title="Frame model in view"
+            >
+              <Move className="h-5 w-5" />
+            </Button>
+            <Button 
+              onClick={toggleFullscreen}
+              variant="viewer" 
+              size="icon"
+              title="Toggle fullscreen"
+            >
+              {isFullscreen ? <MinimizeIcon className="h-5 w-5" /> : <MaximizeIcon className="h-5 w-5" />}
+            </Button>
+            <Button 
+              onClick={() => {
+                if (fileType === 'las') {
+                  setZoomLevel(prev => Math.min(5.0, prev + 0.2));
+                  if (canvasRef.current) {
+                    const ctx = canvasRef.current.getContext('2d');
+                    if (ctx) renderLasVisualization(ctx, canvasRef.current.width, canvasRef.current.height);
+                  }
+                } else if (viewerRef.current) {
+                  viewerRef.current.context.ifcCamera.cameraControls.zoom(1.2);
+                }
+              }}
+              variant="viewer" 
+              size="icon"
+              title="Zoom in"
+            >
+              <ZoomIn className="h-5 w-5" />
+            </Button>
           </div>
         </main>
       </div>
