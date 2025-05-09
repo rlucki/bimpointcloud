@@ -135,6 +135,10 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
     }
   }, [fileType, fileName, toast]);
 
+  const handleViewIn3D = () => {
+    navigate('/viewer', { state: { fileType, fileName } });
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -143,6 +147,11 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
           Back to Upload
         </Button>
         <h2 className="text-2xl font-semibold">3D Model Viewer</h2>
+        
+        <Button variant="outline" onClick={handleViewIn3D} className="flex items-center gap-1">
+          <Box className="h-4 w-4" /> 
+          Open Full Viewer
+        </Button>
       </div>
       
       <Card className="relative overflow-hidden border bg-card shadow-md">
@@ -158,8 +167,8 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
         ) : loadingModel ? (
           <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
-            <h3 className="text-xl font-medium mb-2">Cargando Modelo</h3>
-            <p className="text-muted-foreground">Preparando la visualización del modelo {fileName}</p>
+            <h3 className="text-xl font-medium mb-2">Loading Model</h3>
+            <p className="text-muted-foreground">Preparing to visualize {fileName}</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">

@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Box } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
-import FileItem, { FileItemProps } from "@/components/FileItem";
+import FileItem from "@/components/FileItem";
 
 interface FileWithStatus extends File {
   id: string;
@@ -20,12 +21,27 @@ const FileUploader: React.FC = () => {
   const navigate = useNavigate();
 
   const handleFilesSelected = (selectedFiles: File[]) => {
-    const newFiles = selectedFiles.map((file) => ({
+    // Filter only IFC and LAS files
+    const validFiles = selectedFiles.filter(file => {
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      if (extension === 'ifc' || extension === 'las') {
+        return true;
+      }
+      toast({
+        variant: "destructive",
+        title: "Unsupported file format",
+        description: `File ${file.name} is not supported. Only .ifc and .las files are supported.`
+      });
+      return false;
+    });
+    
+    const newFiles = validFiles.map((file) => ({
       ...file,
       id: `${file.name}-${Date.now()}`,
       progress: 0,
       status: "idle" as const,
     }));
+    
     setFiles((prevFiles) => [...prevFiles, ...newFiles]);
   };
 

@@ -174,7 +174,7 @@ const Viewer = () => {
         
         {/* Main Viewer Area */}
         <main className="flex-1 relative">
-          {/* For the demo, we're embedding TheOpenEngine fragments viewer */}
+          {/* Embed TheOpenEngine fragments viewer */}
           <iframe
             src="https://thatopen.github.io/engine_fragment/examples/FragmentsModels/"
             className="w-full h-full border-none"
