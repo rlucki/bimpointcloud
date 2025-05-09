@@ -62,7 +62,11 @@ export const debugViewer = (viewerRef: React.MutableRefObject<IfcViewerAPI | nul
   if (viewerRef.current) {
     console.log("Viewer state:", viewerRef.current);
     console.log("Scene:", viewerRef.current.context.getScene());
-    console.log("Camera position:", viewerRef.current.context.ifcCamera.cameraControls.getPosition());
+    
+    // Fix: Create a Vector3 object to store the camera position
+    const position = new THREE.Vector3();
+    viewerRef.current.context.ifcCamera.cameraControls.getPosition(position);
+    console.log("Camera position:", position);
     
     // Add a visible marker at origin for debugging
     const geometry = new THREE.SphereGeometry(0.2, 32, 32);
