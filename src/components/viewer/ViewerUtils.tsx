@@ -81,44 +81,73 @@ export const debugViewer = (viewerRef: React.MutableRefObject<IfcViewerAPI | nul
   }
 };
 
-// New framing utility incorporating best practices
+// Improved framing utility for IFC models
 export const frameIFCModel = async (
   viewerRef: React.MutableRefObject<IfcViewerAPI | null>, 
   modelMesh?: THREE.Mesh
 ) => {
-  if (!viewerRef.current) return;
+  if (!viewerRef.current || !modelMesh) return;
   
   try {
-    // If we have a specific mesh, frame it
-    if (modelMesh) {
-      // Force computation of the bounding sphere if it doesn't exist
-      if (modelMesh.geometry && !modelMesh.geometry.boundingSphere) {
-        modelMesh.geometry.computeBoundingSphere();
-      }
-      
-      // Calculate bounding box
-      const bbox = new THREE.Box3().setFromObject(modelMesh);
-      const center = new THREE.Vector3();
-      bbox.getCenter(center);
-      
-      // Create a sphere from the bounding box
-      const sphere = new THREE.Sphere();
-      bbox.getBoundingSphere(sphere);
-      
-      // Frame the model - important to do this AFTER all other camera operations
-      viewerRef.current.context.ifcCamera.cameraControls.setTarget(center.x, center.y, center.z);
-      viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(modelMesh, true);
-      
-      console.log("IFC model framed with proper sizing", {
-        center: center.toArray(),
-        radius: sphere.radius
-      });
-    } else {
-      // If no specific mesh, frame the entire scene
-      const scene = viewerRef.current.context.getScene();
-      // Fix: Always pass the scene object as an argument to fitToSphere
-      viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
+    // Calculate bounding box and center
+    const box = new THREE.Box3().setFromObject(modelMesh);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    
+    // Debug info to help diagnose issues
+    console.table({
+      min: box.min,               // minimum coordinate
+      max: box.max,               // maximum coordinate
+      size,                       // length × height × width
+      center                      // geometric center
+    });
+    
+    // Check for extremely large coordinates (likely UTM or EPSG format)
+    if (box.min.length() > 100000 || box.max.length() > 100000) {
+      console.warn("Model has extremely large coordinates - likely in UTM or EPSG format");
     }
+    
+    // Check for millimeter scale
+    if (size.length() > 10000) {
+      console.warn("Model appears to be in millimeters - consider scaling down by 0.001");
+      // Optional auto-scaling (uncomment if needed)
+      // modelMesh.scale.setScalar(0.001);
+      // box.setFromObject(modelMesh);
+      // box.getCenter(center);
+    }
+    
+    // Recenter the model - move it so its center is at the origin
+    modelMesh.position.sub(center);
+    
+    // Make sure model is in the scene
+    const scene = viewerRef.current.context.getScene();
+    if (!scene.getObjectById(modelMesh.id)) {
+      scene.add(modelMesh);
+    }
+    
+    // Set camera target to origin and fit camera to model
+    viewerRef.current.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+    viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(modelMesh, true);
+    
+    // Adjust camera near/far planes if needed
+    const camera = viewerRef.current.context.getCamera() as THREE.PerspectiveCamera;
+    if (camera) {
+      // Ensure reasonable near/far values
+      camera.near = 0.1;
+      camera.far = Math.max(1000, size.length() * 10);
+      camera.updateProjectionMatrix();
+    }
+    
+    console.log("IFC model framed with proper centering", {
+      newPosition: modelMesh.position,
+      boxSize: size.toArray(),
+      camera: {
+        near: camera?.near,
+        far: camera?.far
+      }
+    });
   } catch (e) {
     console.error("Error framing IFC model:", e);
   }

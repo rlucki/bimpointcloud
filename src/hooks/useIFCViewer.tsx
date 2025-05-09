@@ -1,4 +1,3 @@
-
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -97,22 +96,27 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         const model = await viewer.IFC.loadIfcUrl(url);
         console.log("IFC model loaded successfully:", model);
         
+        // Calculate model bounds and log them for debugging
+        if (model && model.mesh) {
+          const box = new THREE.Box3().setFromObject(model.mesh);
+          const size = new THREE.Vector3();
+          const center = new THREE.Vector3();
+          box.getSize(size);
+          box.getCenter(center);
+
+          console.table({
+            min: box.min,               // minimum coordinate
+            max: box.max,               // maximum coordinate
+            size,                       // length × height × width
+            center                      // geometric center
+          });
+        }
+        
         modelRef.current = model;
         
         if (model && model.mesh) {
-          // Fix: Asegurarse de que el modelo tiene una geometría calculada antes de encuadrarlo
-          if (model.mesh.geometry) {
-            // Force computation of the bounding sphere if needed
-            if (!model.mesh.geometry.boundingSphere) {
-              model.mesh.geometry.computeBoundingSphere();
-            }
-            
-            // Frame the model using our improved utility function
-            await frameIFCModel(viewerRef, model.mesh);
-          } else {
-            // Si no hay geometría definida, utiliza el modelo completo para el encuadre
-            viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
-          }
+          // Frame the model using our improved utility function
+          await frameIFCModel(viewerRef, model.mesh);
         }
         
         setModelLoaded(true);
@@ -158,17 +162,11 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     if (viewerRef.current) {
       try {
         if (modelRef.current && modelRef.current.mesh) {
-          // Force computation of the bounding sphere if needed
-          if (modelRef.current.mesh.geometry && !modelRef.current.mesh.geometry.boundingSphere) {
-            modelRef.current.mesh.geometry.computeBoundingSphere();
-          }
-          
           // Use our improved framing utility
           await frameIFCModel(viewerRef, modelRef.current.mesh);
         } else {
           // Otherwise frame the whole scene
           const scene = viewerRef.current.context.getScene();
-          // Fix: Siempre pasar la escena como argumento a fitToSphere
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         }
         console.log("Framed all objects");
