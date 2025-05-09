@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { IfcViewerAPI } from 'web-ifc-viewer';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,7 @@ import {
   Loader2, 
   RefreshCw,
   Database,
-  Package,
-  Box
+  Package 
 } from 'lucide-react';
 
 interface ViewerDiagnosticsProps {
@@ -24,9 +23,6 @@ interface ViewerDiagnosticsProps {
   fileName?: string | null;
   onClose: () => void;
   onReload: () => void;
-  wasmLoaded?: boolean;
-  modelLoaded?: boolean;
-  meshExists?: boolean;
 }
 
 const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({ 
@@ -34,14 +30,11 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
   fileUrl, 
   fileName, 
   onClose,
-  onReload,
-  wasmLoaded: initialWasmLoaded = null,
-  modelLoaded: initialModelLoaded = null,
-  meshExists: initialMeshExists = null
+  onReload
 }) => {
-  const [wasmLoaded, setWasmLoaded] = useState<boolean | null>(initialWasmLoaded);
-  const [modelLoaded, setModelLoaded] = useState<boolean | null>(initialModelLoaded);
-  const [meshExists, setMeshExists] = useState<boolean | null>(initialMeshExists);
+  const [wasmLoaded, setWasmLoaded] = useState<boolean | null>(null);
+  const [modelLoaded, setModelLoaded] = useState<boolean | null>(null);
+  const [meshExists, setMeshExists] = useState<boolean | null>(null);
   const [modelSize, setModelSize] = useState<THREE.Vector3 | null>(null);
   const [modelCenter, setModelCenter] = useState<THREE.Vector3 | null>(null);
   const [modelMinMax, setModelMinMax] = useState<{min: THREE.Vector3, max: THREE.Vector3} | null>(null);
@@ -50,18 +43,13 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fixApplied, setFixApplied] = useState<string | null>(null);
   
-  // Check for WASM files if not provided
+  // Check for WASM files
   useEffect(() => {
-    if (initialWasmLoaded !== null) return;
-    
     const checkWasmFiles = async () => {
       try {
-        // Calculate the base URL path
-        const basePath = import.meta.env.BASE_URL.replace(/\/$/, '') + '/wasm/';
         // Check if web-ifc.wasm can be fetched
-        const response = await fetch(`${basePath}web-ifc.wasm`, { method: 'HEAD' });
+        const response = await fetch('/wasm/web-ifc.wasm', { method: 'HEAD' });
         setWasmLoaded(response.ok);
-        console.log("WASM file check:", response.ok ? "Available" : "Missing");
       } catch (e) {
         setWasmLoaded(false);
         console.error('Error checking WASM files:', e);
@@ -69,7 +57,7 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
     };
     
     checkWasmFiles();
-  }, [initialWasmLoaded]);
+  }, []);
   
   // Run diagnostics
   const runDiagnostics = async () => {
@@ -98,8 +86,7 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
         console.log('Attempting to load IFC model for diagnostics');
         
         // Set WASM path first
-        const wasmPath = import.meta.env.BASE_URL.replace(/\/$/, '') + '/wasm/';
-        await viewer.IFC.setWasmPath(wasmPath);
+        await viewer.IFC.setWasmPath('/wasm/');
         console.log('WASM path set');
         
         try {
@@ -152,101 +139,59 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
   
   // Apply fix based on diagnostic results
   const applyFix = async () => {
-    if (!viewer) {
-      setErrorMessage('Cannot apply fix: Viewer not ready');
-      setIsLoading(false);
+    if (!viewer || !modelLoaded || !meshExists) {
+      setErrorMessage('Cannot apply fix: Viewer not ready or model not loaded');
       return;
     }
     
     try {
       setIsLoading(true);
-      let fixesApplied = [];
       
-      // Fix 1: Set WASM path again (most common issue)
-      try {
-        const wasmPath = import.meta.env.BASE_URL.replace(/\/$/, '') + '/wasm/';
-        await viewer.IFC.setWasmPath(wasmPath);
-        
-        // Verify WASM path
-        const response = await fetch(`${wasmPath}web-ifc.wasm`, { method: 'HEAD' });
-        setWasmLoaded(response.ok);
-        
-        if (response.ok) {
-          fixesApplied.push('WASM path re-configured');
-        } else {
-          throw new Error('WASM files still not accessible');
-        }
-      } catch (e) {
-        setErrorMessage(`WASM path fix failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
-      
-      // Find model mesh if it exists
+      // Find the model in the scene (current implementation assumes only one model)
       let modelMesh: THREE.Object3D | null = null;
-      if (fileUrl && wasmLoaded) {
-        try {
-          // Try loading the model again
-          const model = await viewer.IFC.loadIfcUrl(fileUrl);
-          setModelLoaded(true);
-          modelMesh = model?.mesh || null;
-          
-          if (modelMesh) {
-            setMeshExists(true);
-            fixesApplied.push('Model reloaded successfully');
-            
-            // Apply fixes based on detected issues
-            const box = new THREE.Box3().setFromObject(modelMesh);
-            const size = new THREE.Vector3();
-            const center = new THREE.Vector3();
-            box.getSize(size);
-            box.getCenter(center);
-            
-            setModelSize(size);
-            setModelCenter(center);
-            setModelMinMax({
-              min: box.min.clone(),
-              max: box.max.clone()
-            });
-            
-            // Fix 2: Check for extremely large coordinates (UTM/EPSG format)
-            if (center.length() > 5000) {
-              console.log('Fixing large coordinates - recentering model');
-              modelMesh.position.sub(center);
-              fixesApplied.push('Model recentered to origin');
-            }
-            
-            // Fix 3: Check for models in millimeters
-            if (size.length() > 10000) {
-              console.log('Fixing millimeter scale - scaling down by 0.001');
-              modelMesh.scale.setScalar(0.001); 
-              fixesApplied.push('Model rescaled from mm to m');
-            }
-            
-            // Fix 4: Adjust camera planes
-            const camera = viewer.context.getCamera() as THREE.PerspectiveCamera;
-            camera.near = 0.1;
-            camera.far = Math.max(10000, size.length() * 20);
-            camera.updateProjectionMatrix();
-            fixesApplied.push(`Camera near/far adjusted (near: ${camera.near}, far: ${camera.far})`);
-            
-            // Fix 5: Reset camera target and frame model
-            viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
-            viewer.context.ifcCamera.cameraControls.fitToSphere(modelMesh, true);
-            fixesApplied.push('Camera position and target reset');
-          } else {
-            setMeshExists(false);
-            setErrorMessage('Model loaded but mesh is missing');
-          }
-        } catch (e) {
-          console.error('Error applying model fix:', e);
-          setErrorMessage(`Error loading model after WASM fix: ${e instanceof Error ? e.message : String(e)}`);
+      viewer.context.getScene().traverse((object) => {
+        if (object.userData && object.userData.modelID !== undefined) {
+          modelMesh = object;
         }
+      });
+      
+      if (!modelMesh) {
+        setErrorMessage('Cannot find model mesh in scene');
+        return;
       }
       
-      if (fixesApplied.length > 0) {
+      // Apply fixes based on detected issues
+      if (modelSize && modelCenter) {
+        let fixesApplied = [];
+        
+        // Fix 1: Check for extremely large coordinates (UTM/EPSG format)
+        if (modelCenter.length() > 10000 || modelMinMax?.min.length() > 10000 || modelMinMax?.max.length() > 10000) {
+          console.log('Fixing large coordinates - recentering model');
+          modelMesh.position.sub(modelCenter);
+          fixesApplied.push('Model recentered to origin');
+        }
+        
+        // Fix 2: Check for models in millimeters
+        if (modelSize.length() > 1000) {
+          console.log('Fixing millimeter scale - scaling down by 0.001');
+          modelMesh.scale.setScalar(0.001); 
+          fixesApplied.push('Model rescaled from mm to m');
+        }
+        
+        // Fix 3: Adjust camera planes
+        const camera = viewer.context.getCamera() as THREE.PerspectiveCamera;
+        camera.near = 0.1;
+        camera.far = Math.max(10000, modelSize.length() * 20);
+        camera.updateProjectionMatrix();
+        fixesApplied.push(`Camera near/far adjusted (near: ${camera.near}, far: ${camera.far})`);
+        
+        // Fix 4: Reset camera target and frame model
+        viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
+        viewer.context.ifcCamera.cameraControls.fitToSphere(modelMesh, true);
+        fixesApplied.push('Camera position and target reset');
+        
         setFixApplied(fixesApplied.join(', '));
         console.log('Fixes applied:', fixesApplied.join(', '));
-      } else {
-        setFixApplied('No fixes could be applied automatically');
       }
     } catch (e) {
       console.error('Error applying fix:', e);
@@ -329,7 +274,7 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
             
             <div className="flex items-center justify-between bg-muted p-3 rounded-md">
               <div className="flex items-center gap-2">
-                <Box className="h-4 w-4" />
+                <Package className="h-4 w-4" />
                 <span>Mesh exists</span>
               </div>
               <div className="flex items-center">
@@ -400,7 +345,7 @@ const ViewerDiagnostics: React.FC<ViewerDiagnosticsProps> = ({
           
           <Button 
             onClick={applyFix}
-            disabled={isLoading} 
+            disabled={isLoading || !modelLoaded || !meshExists} 
             variant="secondary"
             className="flex items-center gap-2"
           >
