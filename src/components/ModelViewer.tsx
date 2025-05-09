@@ -3,7 +3,7 @@ import React, { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Cube, Info } from "lucide-react";
+import { ArrowLeft, Box, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface ModelViewerProps {
@@ -105,7 +105,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName }) => {
       <Card className="relative overflow-hidden border bg-card shadow-md">
         {(!fileType || !fileName) ? (
           <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
-            <Cube className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
+            <Box className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
             <h3 className="text-xl font-medium mb-2">No Models Available</h3>
             <p className="text-muted-foreground max-w-md mb-6">
               Upload IFC or LAS files from the main page to visualize them in 3D.

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
-import { Cube } from "lucide-react";
+import { Box } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
 import FileItem, { FileItemProps } from "@/components/FileItem";
 
@@ -194,7 +194,7 @@ const FileUploader: React.FC = () => {
               variant="outline"
               className="flex items-center gap-1"
             >
-              <Cube className="h-4 w-4" /> View in 3D
+              <Box className="h-4 w-4" /> View in 3D
             </Button>
           )}
         </div>
