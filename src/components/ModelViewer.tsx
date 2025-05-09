@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,6 +7,14 @@ import { ArrowLeft, Box, Eye, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
+import IfcViewerContainer from "./viewer/IfcViewerContainer";
+import ViewerHeader from "./viewer/ViewerHeader";
+import ViewerStatus from "./viewer/ViewerStatus";
+import ViewerDropArea from "./viewer/ViewerDropArea";
+import ViewerPlaceholder from "./viewer/ViewerPlaceholder";
+import ViewerError from "./viewer/ViewerError";
+import ViewerLoading from "./viewer/ViewerLoading";
+import ViewerCanvas from "./viewer/ViewerCanvas";
 
 interface ModelViewerProps {
   fileType: "ifc" | "las" | null;
@@ -365,8 +374,9 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
           // If a specific target is provided, frame that object
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(target, true);
         } else {
-          // Default behavior for framing all objects - pass the scene as the required first argument
-          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(viewerRef.current.context.getScene(), true);
+          // FIX: Pass the scene as the required first argument
+          const scene = viewerRef.current.context.getScene();
+          viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         }
         console.log("Framed objects");
       } catch (e) {
@@ -377,30 +387,13 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
 
   return (
     <div className="w-full max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <Button variant="ghost" onClick={() => navigate('/')} className="flex items-center gap-1">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Upload
-        </Button>
-        <h2 className="text-2xl font-semibold">3D Model Viewer</h2>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={openFileDialog} className="flex items-center gap-1">
-            <Box className="h-4 w-4" /> 
-            Open File
-            <input 
-              ref={fileInputRef}
-              type="file"
-              accept=".ifc,.las"
-              onChange={handleFileInputChange}
-              className="hidden"
-            />
-          </Button>
-          {process.env.NODE_ENV !== 'production' && (
-            <Button variant="ghost" onClick={debug}>Debug</Button>
-          )}
-        </div>
-      </div>
+      <ViewerHeader 
+        navigate={navigate} 
+        openFileDialog={openFileDialog} 
+        fileInputRef={fileInputRef}
+        handleFileInputChange={handleFileInputChange}
+        debug={debug}
+      />
       
       <Card 
         className={`relative overflow-hidden border shadow-md transition-all duration-300 ${isDragging ? 'border-primary bg-primary/5' : 'bg-card'}`}
@@ -410,87 +403,30 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         onDrop={handleDrop}
       >
         {loadingModel ? (
-          <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
-            <h3 className="text-xl font-medium mb-2">Loading Model</h3>
-            <p className="text-muted-foreground">Preparing to visualize {fileName}</p>
-          </div>
+          <ViewerLoading fileName={fileName} />
         ) : error ? (
-          <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
-            <div className="text-red-500 mb-4">⚠️</div>
-            <h3 className="text-xl font-medium mb-2 text-red-500">Error</h3>
-            <p className="text-muted-foreground">{error}</p>
-            <Button onClick={() => navigate('/')} className="mt-4">Return to Upload</Button>
-          </div>
+          <ViewerError error={error} navigate={navigate} />
         ) : fileType === 'ifc' ? (
-          <div 
-            ref={containerRef} 
-            className="w-full h-[600px] relative"
-            style={{ visibility: viewerInitialized ? 'visible' : 'hidden' }}
-          >
-            {isDragging && (
-              <div className="absolute inset-0 bg-primary/10 flex items-center justify-center z-10">
-                <div className="text-center p-6 bg-card rounded-lg shadow">
-                  <Eye className="mx-auto h-12 w-12 text-primary mb-2" />
-                  <p className="text-lg font-medium">Drop to load file</p>
-                </div>
-              </div>
-            )}
-            
-            {/* Status indicator */}
-            <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-2 rounded-md text-sm">
-              {modelLoaded ? (
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                  Model loaded: {fileName}
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div>
-                  Viewer ready - No model loaded
-                </div>
-              )}
-            </div>
-          </div>
+          <IfcViewerContainer 
+            containerRef={containerRef}
+            viewerInitialized={viewerInitialized}
+            isDragging={isDragging}
+            modelLoaded={modelLoaded}
+            fileName={fileName}
+          />
         ) : (
-          <div className="p-4 relative">
-            <canvas
-              ref={canvasRef}
-              width={1000}
-              height={600}
-              className="w-full h-full rounded-md"
-            ></canvas>
-            {isDragging && (
-              <div className="absolute inset-0 bg-primary/10 flex items-center justify-center z-10">
-                <div className="text-center p-6 bg-card rounded-lg shadow">
-                  <Eye className="mx-auto h-12 w-12 text-primary mb-2" />
-                  <p className="text-lg font-medium">Drop to load file</p>
-                </div>
-              </div>
-            )}
-          </div>
+          <ViewerCanvas 
+            canvasRef={canvasRef} 
+            isDragging={isDragging} 
+          />
         )}
 
         {!fileType && !fileName && !loadingModel && !error && (
-          <div className="flex flex-col items-center justify-center text-center p-10 min-h-[500px]">
-            <Box className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
-            <h3 className="text-xl font-medium mb-2">Drag & Drop to View</h3>
-            <p className="text-muted-foreground max-w-md mb-6">
-              Drag and drop your IFC or LAS files here to visualize them, or click "Open File" above.
-            </p>
-            <Button onClick={openFileDialog}>Select File</Button>
-          </div>
+          <ViewerPlaceholder openFileDialog={openFileDialog} />
         )}
       </Card>
       
-      <div className="mt-6 flex justify-between">
-        <div className="flex items-center text-sm text-muted-foreground">
-          <Info className="h-4 w-4 mr-1" /> 
-          {fileType === 'ifc' 
-            ? "IFC Viewer powered by web-ifc-viewer and Three.js"
-            : "LAS point cloud visualization requires additional configuration."}
-        </div>
-      </div>
+      <ViewerStatus fileType={fileType} />
     </div>
   );
 };
