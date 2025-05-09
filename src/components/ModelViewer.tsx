@@ -90,7 +90,9 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
               
               // Fit to model after loading
               setTimeout(() => {
-                viewer?.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+                if (viewer && model.mesh) { // Add null check for viewer and model.mesh
+                  viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+                }
               }, 500);
               
               setModelLoaded(true);
