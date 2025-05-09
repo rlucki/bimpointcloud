@@ -17,6 +17,15 @@ const FileItem: React.FC<FileItemProps> = ({
   status,
   onRemove,
 }) => {
+  // Format file size properly
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+  
   // Add a safety check to ensure file and file.name exist before using split
   const fileExtension = file && file.name ? file.name.split(".").pop()?.toLowerCase() : '';
   
@@ -44,6 +53,10 @@ const FileItem: React.FC<FileItemProps> = ({
     }
   };
   
+  // Calculate actual file name and size
+  const displayName = file?.name || "Unknown file";
+  const displaySize = file?.size ? formatFileSize(file.size) : "0 KB";
+  
   return (
     <div className={cn(
       "flex items-center p-3 rounded-md mb-3 bg-background border",
@@ -54,10 +67,10 @@ const FileItem: React.FC<FileItemProps> = ({
       </div>
       <div className="flex-grow mr-3">
         <div className="flex justify-between items-center mb-1">
-          <h4 className="text-sm font-medium truncate max-w-[200px] sm:max-w-[300px]" title={file?.name || "Unknown file"}>
-            {file?.name || "Unknown file"}
+          <h4 className="text-sm font-medium truncate max-w-[200px] sm:max-w-[300px]" title={displayName}>
+            {displayName}
           </h4>
-          <span className="text-xs text-muted-foreground">{file?.size ? Math.round(file.size / 1024) : 0} KB</span>
+          <span className="text-xs text-muted-foreground">{displaySize}</span>
         </div>
         <Progress value={progress} className="h-2" />
       </div>

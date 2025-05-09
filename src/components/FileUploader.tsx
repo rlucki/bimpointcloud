@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -20,7 +20,23 @@ const FileUploader: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Debug logs to help troubleshoot file issues
+  useEffect(() => {
+    if (files.length > 0) {
+      console.log("Current files:", files);
+      files.forEach(file => {
+        console.log(`File: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
+      });
+    }
+  }, [files]);
+
   const handleFilesSelected = (selectedFiles: File[]) => {
+    // Debug logs for selected files
+    console.log("Selected files:", selectedFiles);
+    selectedFiles.forEach(file => {
+      console.log(`Selected file: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
+    });
+    
     // Filter only IFC and LAS files
     const validFiles = selectedFiles.filter(file => {
       const extension = file.name.split('.').pop()?.toLowerCase();
@@ -35,12 +51,21 @@ const FileUploader: React.FC = () => {
       return false;
     });
     
-    const newFiles = validFiles.map((file) => ({
-      ...file,
-      id: `${file.name}-${Date.now()}`,
-      progress: 0,
-      status: "idle" as const,
-    }));
+    // Create file objects with additional properties
+    const newFiles = validFiles.map((file) => {
+      // Ensure we've captured all file properties correctly
+      const fileWithStatus = {
+        ...file,
+        id: `${file.name}-${Date.now()}`,
+        progress: 0,
+        status: "idle" as const,
+      };
+      
+      // Debug log for the created file object
+      console.log("Created file with status:", fileWithStatus);
+      
+      return fileWithStatus;
+    });
     
     setFiles((prevFiles) => [...prevFiles, ...newFiles]);
   };
