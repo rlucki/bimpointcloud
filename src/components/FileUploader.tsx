@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,14 +125,27 @@ const FileUploader: React.FC = () => {
     
     if (successFile && successFile.name) {
       const fileExtension = successFile.name.split('.').pop()?.toLowerCase();
-      const fileType = fileExtension === 'ifc' ? 'ifc' : fileExtension === 'las' ? 'las' : null;
+      let fileType = null;
+      
+      if (fileExtension === 'ifc') {
+        fileType = 'ifc';
+      } else if (fileExtension === 'las') {
+        fileType = 'las';
+      }
       
       // Log information for debugging
       console.log("Navigating to viewer with:", { fileType, fileName: successFile.name });
       
-      navigate('/viewer', { state: { fileType, fileName: successFile.name } });
+      if (fileType) {
+        navigate('/viewer', { state: { fileType, fileName: successFile.name } });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Unsupported file format",
+          description: `The file ${successFile.name} has an unsupported format.`,
+        });
+      }
     } else {
-      // Show more detailed error message
       toast({
         variant: "destructive",
         title: "No uploaded files",
