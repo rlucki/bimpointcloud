@@ -1,8 +1,8 @@
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import ViewerDropArea from "./ViewerDropArea";
-import * as THREE from "three";
-import { IfcViewerAPI } from "web-ifc-viewer";
+import { Button } from "@/components/ui/button";
+import { Bug } from "lucide-react";
 
 interface IfcViewerContainerProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -10,6 +10,7 @@ interface IfcViewerContainerProps {
   isDragging: boolean;
   modelLoaded: boolean;
   fileName: string | null;
+  onOpenDiagnostics?: () => void;
 }
 
 const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({ 
@@ -17,7 +18,8 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
   viewerInitialized,
   isDragging,
   modelLoaded,
-  fileName
+  fileName,
+  onOpenDiagnostics
 }) => {
   return (
     <div 
@@ -41,6 +43,20 @@ const IfcViewerContainer: React.FC<IfcViewerContainerProps> = ({
           </div>
         )}
       </div>
+      
+      {/* Diagnostics shortcut button */}
+      {!modelLoaded && onOpenDiagnostics && viewerInitialized && (
+        <div className="absolute top-4 right-4">
+          <Button 
+            onClick={onOpenDiagnostics}
+            className="bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1"
+            size="sm"
+          >
+            <Bug className="h-4 w-4" />
+            <span>Diagnose Model</span>
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

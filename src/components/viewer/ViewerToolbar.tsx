@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, MaximizeIcon, MinimizeIcon, Settings, Bug } from "lucide-react";
+import { Menu, X, MaximizeIcon, MinimizeIcon, Settings, Bug, AlertCircle } from "lucide-react";
 
 interface ViewerToolbarProps {
   title: string;
@@ -34,18 +34,17 @@ const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
         </div>
       </div>
       
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center space-x-2">
         {onDiagnostics && (
           <Button 
-            variant={isDiagnosticsEnabled ? "default" : "ghost"} 
-            size="icon" 
+            variant="default" 
+            size="sm" 
             onClick={onDiagnostics} 
-            className={isDiagnosticsEnabled 
-              ? "bg-amber-500 text-white hover:bg-amber-600" 
-              : "text-white hover:bg-[#444444]"}
+            className="bg-amber-500 text-white hover:bg-amber-600 flex items-center gap-1"
             title="Diagnose viewer issues"
           >
             <Bug className="h-4 w-4" />
+            <span>Diagnose</span>
           </Button>
         )}
         {process.env.NODE_ENV === 'development' && onDebug && (
@@ -53,11 +52,11 @@ const ViewerToolbar: React.FC<ViewerToolbarProps> = ({
             <Settings className="h-4 w-4" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-[#444444]">
-          <X className="h-4 w-4" />
-        </Button>
         <Button variant="ghost" size="icon" onClick={onToggleFullscreen} className="text-white hover:bg-[#444444]">
           {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-[#444444]">
+          <X className="h-4 w-4" />
         </Button>
       </div>
     </header>
