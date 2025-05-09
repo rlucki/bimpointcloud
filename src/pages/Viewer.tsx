@@ -16,7 +16,8 @@ import {
   ZoomIn,
   Layers,
   Eye,
-  EyeOff
+  EyeOff,
+  Move
 } from "lucide-react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -93,7 +94,7 @@ const Viewer = () => {
         
         // If there's an IFC file, initialize the IFC viewer
         const ifcFile = files.find(file => file.fileType === 'ifc');
-        if (ifcFile && ifcFile.fileUrl) {
+        if (ifcFile) {
           initializeIfcViewer(ifcFile);
         }
       }, 1000);
@@ -133,15 +134,24 @@ const Viewer = () => {
       // Load all IFC models
       for (const file of files.filter(f => f.fileType === 'ifc' && f.fileUrl)) {
         try {
-          console.log(`Loading IFC model: ${file.fileName}`);
-          const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
+          console.log(`Loading IFC model: ${file.fileName} from URL: ${file.fileUrl}`);
           
-          // Store reference to the model
-          if (file.id) {
-            modelRefs.current[file.id] = model;
+          // Use loadIfcUrl with the file's URL
+          if (file.fileUrl) {
+            const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
+            
+            // Store reference to the model
+            if (file.id) {
+              modelRefs.current[file.id] = model;
+            }
+            
+            console.log("IFC model loaded successfully:", model);
+            
+            // Fit to model after loading
+            setTimeout(() => {
+              viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
+            }, 500);
           }
-          
-          console.log("IFC model loaded:", model);
         } catch (e) {
           console.error(`Error loading IFC model ${file.fileName}:`, e);
           toast({
@@ -151,11 +161,6 @@ const Viewer = () => {
           });
         }
       }
-      
-      // Center view on all models
-      setTimeout(() => {
-        viewer.context.ifcCamera.cameraControls.fitToSphere(viewer.context.getScene(), true);
-      }, 500);
     } catch (e) {
       console.error("Error initializing IFC viewer:", e);
       toast({
@@ -204,6 +209,19 @@ const Viewer = () => {
 
   const toggleStats = () => {
     setShowStats(prev => !prev);
+  };
+
+  const frameAll = () => {
+    // If using IFC Viewer
+    if (viewerRef.current) {
+      try {
+        // Fit the camera to the scene
+        viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(viewerRef.current.context.getScene(), true);
+        console.log("Framed all objects in IFC viewer");
+      } catch (e) {
+        console.error("Error framing all objects in IFC viewer:", e);
+      }
+    }
   };
 
   const goBack = () => {
@@ -333,7 +351,7 @@ const Viewer = () => {
             </div>
           ) : null}
           
-          {/* Overlay with instructions - MOVED OUTSIDE Canvas */}
+          {/* Overlay with instructions */}
           <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-2 rounded pointer-events-none">
             <div className="flex items-center gap-2 text-sm">
               <Axis3d className="h-4 w-4" /> 
@@ -341,7 +359,7 @@ const Viewer = () => {
             </div>
           </div>
           
-          {/* File info overlay - MOVED OUTSIDE Canvas */}
+          {/* File info overlay */}
           <div className="absolute bottom-4 right-4 pointer-events-none">
             <div className="bg-[#333333] text-white px-3 py-2 rounded border border-[#444444]">
               <div className="flex items-center gap-2">
@@ -358,11 +376,21 @@ const Viewer = () => {
             </div>
           </div>
           
-          {/* Viewer Controls - MOVED OUTSIDE Canvas */}
+          {/* Viewer Controls */}
           <div className="absolute top-4 right-4 flex flex-col space-y-2 pointer-events-auto">
             <Button 
+              onClick={frameAll}
+              variant="viewer" 
+              size="icon"
+              title="Frame all objects"
+              className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
+            >
+              <Move className="h-5 w-5" />
+            </Button>
+            
+            <Button 
               onClick={toggleFullscreen}
-              variant="outline" 
+              variant="viewer" 
               size="icon"
               title="Toggle fullscreen"
               className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"
@@ -372,7 +400,7 @@ const Viewer = () => {
             
             <Button 
               onClick={toggleStats}
-              variant="outline" 
+              variant="viewer" 
               size="icon"
               title="Toggle performance stats"
               className="bg-[#333333] text-white hover:bg-[#444444] border-[#444444]"

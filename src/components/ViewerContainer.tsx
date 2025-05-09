@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 import { OrbitControls, Stats, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { Scan } from 'lucide-react';
 
 interface ViewerContainerProps {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ const ViewerContainer: React.FC<ViewerContainerProps> = ({
 }) => {
   const { camera, gl, scene } = useThree();
   const [isReady, setIsReady] = useState(false);
+  const controlsRef = useRef<any>(null);
   
   useEffect(() => {
     // Set up camera position on mount
@@ -41,6 +43,50 @@ const ViewerContainer: React.FC<ViewerContainerProps> = ({
       }
     };
   }, [camera, gl, scene]);
+
+  // Function to frame or fit the view to all objects
+  const handleFrameAll = () => {
+    if (controlsRef.current) {
+      // Get all visible objects in the scene
+      const visibleObjects = [];
+      scene.traverse((object) => {
+        if (object.type === 'Mesh' && object.visible) {
+          visibleObjects.push(object);
+        }
+      });
+
+      if (visibleObjects.length > 0) {
+        // Create a bounding box that encompasses all objects
+        const boundingBox = new THREE.Box3();
+        for (const object of visibleObjects) {
+          boundingBox.expandByObject(object);
+        }
+
+        // Calculate the center and size of the bounding box
+        const center = new THREE.Vector3();
+        boundingBox.getCenter(center);
+        
+        // Set the target to the center of all objects
+        controlsRef.current.target.copy(center);
+        
+        // Calculate the radius of a sphere that contains the bounding box
+        const size = new THREE.Vector3();
+        boundingBox.getSize(size);
+        const radius = Math.max(size.x, size.y, size.z) * 0.5;
+        
+        // Set the camera position based on the radius
+        const distance = radius * 2;
+        const direction = new THREE.Vector3(1, 1, 1).normalize();
+        const position = center.clone().add(direction.multiplyScalar(distance));
+        
+        // Move the camera
+        camera.position.copy(position);
+        camera.lookAt(center);
+        camera.updateProjectionMatrix();
+        controlsRef.current.update();
+      }
+    }
+  };
   
   return (
     <>
@@ -64,6 +110,7 @@ const ViewerContainer: React.FC<ViewerContainerProps> = ({
       
       {/* Viewer controls */}
       <OrbitControls 
+        ref={controlsRef}
         makeDefault 
         enableDamping={true}
         dampingFactor={0.05}
@@ -73,7 +120,64 @@ const ViewerContainer: React.FC<ViewerContainerProps> = ({
       
       {/* Child components (IFC models, point clouds, etc.) */}
       {isReady && children}
+      
+      {/* Frame button - added to the scene as HTML */}
+      <Html position={[-10, 5, 0]}>
+        <button 
+          onClick={handleFrameAll}
+          className="bg-[#333333] text-white px-3 py-2 rounded hover:bg-[#444444] flex items-center gap-1 border border-[#444444]"
+        >
+          <span className="material-icons">center_focus_strong</span>
+          Frame All
+        </button>
+      </Html>
     </>
+  );
+};
+
+// Create a helper component for HTML content in the 3D scene
+const Html: React.FC<{ children: React.ReactNode, position: [number, number, number] }> = ({ children, position }) => {
+  const { camera } = useThree();
+  const htmlRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const updatePosition = () => {
+      if (!htmlRef.current) return;
+      
+      // Convert 3D position to screen space
+      const vector = new THREE.Vector3(...position);
+      vector.project(camera);
+      
+      // Convert to CSS coordinates
+      const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+      
+      // Apply the transformation
+      htmlRef.current.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+    };
+    
+    // Update position on each frame
+    const intervalId = setInterval(updatePosition, 16);
+    window.addEventListener('resize', updatePosition);
+    
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [camera, position]);
+  
+  return (
+    <div 
+      ref={htmlRef} 
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        pointerEvents: 'auto'
+      }}
+    >
+      {children}
+    </div>
   );
 };
 
