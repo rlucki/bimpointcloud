@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
     },
     // Middleware personalizado para servir archivos WASM con el tipo MIME correcto
     middlewares: [
-      (req: Connect.IncomingMessage, res: Connect.ServerResponse, next: Connect.NextFunction) => {
+      (req: Connect.IncomingMessage, res: any, next: Connect.NextFunction) => {
         if (req.url && req.url.endsWith('.wasm')) {
           // Establecer el tipo MIME correcto para archivos WASM
           res.setHeader('Content-Type', 'application/wasm');
