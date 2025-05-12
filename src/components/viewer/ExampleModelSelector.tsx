@@ -2,6 +2,7 @@
 import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
 
 interface ExampleModelSelectorProps {
   onLoadExample: (url: string) => void;
@@ -63,6 +64,16 @@ const ExampleModelSelector: React.FC<ExampleModelSelectorProps> = ({ onLoadExamp
           Load Example
         </Button>
       </div>
+      
+      <div className="mt-3 p-2 bg-amber-950/30 border border-amber-600/30 rounded-md flex items-start gap-2">
+        <AlertTriangle className="text-amber-500 h-4 w-4 mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-amber-200/80">
+          <span className="font-semibold">Importante:</span> Para que estos modelos se carguen correctamente, 
+          asegúrate de tener los archivos WASM en la carpeta <span className="bg-black/30 px-1 rounded">public/wasm/</span> 
+          de tu proyecto.
+        </p>
+      </div>
+      
       <p className="text-xs text-muted-foreground mt-2">
         These models are loaded directly from public repositories. No upload required.
       </p>
