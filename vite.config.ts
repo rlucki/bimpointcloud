@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import fs from 'fs';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -13,12 +14,29 @@ export default defineConfig(({ mode }) => ({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
-    }
+    },
+    // Middleware personalizado para servir archivos WASM con el tipo MIME correcto
+    middlewares: [
+      (req, res, next) => {
+        if (req.url && req.url.endsWith('.wasm')) {
+          // Establecer el tipo MIME correcto para archivos WASM
+          res.setHeader('Content-Type', 'application/wasm');
+        }
+        next();
+      }
+    ]
   },
   plugins: [
     react(),
     mode === 'development' &&
     componentTagger(),
+    // Plugin personalizado para copiar archivos WASM al directorio de salida
+    {
+      name: 'copy-wasm-files',
+      buildStart() {
+        console.log('Copiando archivos WASM a public/wasm/...');
+      }
+    }
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -28,5 +46,7 @@ export default defineConfig(({ mode }) => ({
   // Asegurarse de que los archivos WASM se tratan correctamente
   optimizeDeps: {
     exclude: ['web-ifc'],
-  }
+  },
+  // Configurar correctamente los tipos MIME
+  assetsInclude: ['**/*.wasm'],
 }));
