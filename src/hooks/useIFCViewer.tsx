@@ -1,3 +1,4 @@
+
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
@@ -16,7 +17,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [modelLoaded, setModelLoaded] = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState<string>("Initializing viewer...");
+  const [loadingStatus, setLoadingStatus] = useState<string>("Inicializando visor...");
   const viewerRef = useRef<IfcViewerAPI | null>(null);
   const modelRef = useRef<any>(null);
   const { toast } = useToast();
@@ -29,8 +30,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       try {
         if (!containerRef.current) return;
         
-        setLoadingStatus("Creating IFC viewer...");
-        console.log("Initializing IFC viewer...");
+        setLoadingStatus("Creando visor IFC...");
+        console.log("Inicializando visor IFC...");
         
         // Create the viewer
         viewer = new IfcViewerAPI({
@@ -39,6 +40,10 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         });
         
         viewerRef.current = viewer;
+        
+        // IMPORTANTE: Configurar la ruta WASM desde el inicio
+        await viewer.IFC.setWasmPath("/wasm/");
+        console.log("Ruta WASM configurada para el parseador IFC");
         
         // Set up camera
         viewer.context.ifcCamera.cameraControls.setPosition(5, 5, 5);
@@ -60,7 +65,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         directionalLight.position.set(5, 10, 3);
         viewer.context.getScene().add(directionalLight);
         
-        setLoadingStatus("Viewer initialized successfully");
+        setLoadingStatus("Visor inicializado correctamente");
         setIsInitialized(true);
         
         // Try to load model if URL is provided
@@ -78,18 +83,18 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           viewer.context.getScene().add(cube);
           
           setIsLoading(false);
-          setLoadingStatus("Demo mode - no IFC model");
+          setLoadingStatus("Modo demo - sin modelo IFC");
         }
         
       } catch (e) {
-        console.error("Error initializing IFC viewer:", e);
-        setError("Failed to initialize IFC viewer. Please try again.");
+        console.error("Error inicializando el visor IFC:", e);
+        setError("Error al inicializar el visor IFC. Por favor, inténtelo de nuevo.");
         setErrorDetails(e instanceof Error ? e.message : String(e));
         setIsLoading(false);
         toast({
           variant: "destructive",
-          title: "Visualization error",
-          description: "Could not initialize the IFC viewer.",
+          title: "Error de visualización",
+          description: "No se pudo inicializar el visor IFC.",
         });
       }
     };
@@ -97,17 +102,23 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     // Helper function to load model
     const loadModel = async (viewer: IfcViewerAPI, url: string) => {
       try {
-        console.log("Loading IFC model from URL:", url);
-        setLoadingStatus("Setting up WebAssembly for IFC parsing...");
+        console.log("Cargando modelo IFC desde URL:", url);
+        setLoadingStatus("Preparando WebAssembly para analizar IFC...");
         
-        // IMPORTANT: Set the WebAssembly path before loading the model
-        // Ensure this path points to your actual WASM files
-        await viewer.IFC.setWasmPath("/wasm/");
-        console.log("WASM path set for IFC parser");
+        // Explícitamente verificamos si podemos acceder a los archivos WASM
+        try {
+          const wasmResponse = await fetch("/wasm/web-ifc.wasm", { method: 'HEAD' });
+          if (!wasmResponse.ok) {
+            throw new Error(`No se pudo acceder a los archivos WASM necesarios (${wasmResponse.status})`);
+          }
+          console.log("Archivos WASM accesibles");
+        } catch (wasmError) {
+          console.error("Error al verificar archivos WASM:", wasmError);
+        }
         
-        setLoadingStatus(`Loading model: ${fileName || url}...`);
+        setLoadingStatus(`Cargando modelo: ${fileName || url}...`);
         const model = await viewer.IFC.loadIfcUrl(url);
-        console.log("IFC model loaded successfully:", model);
+        console.log("Modelo IFC cargado correctamente:", model);
         
         // Calculate model bounds and log them for debugging
         if (model && model.mesh) {
@@ -126,20 +137,20 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           
           // Check for extremely large coordinates (likely UTM or EPSG format)
           if (box.min.length() > 100000 || box.max.length() > 100000) {
-            console.warn("Model has extremely large coordinates - likely in UTM or EPSG format");
+            console.warn("El modelo tiene coordenadas extremadamente grandes - probablemente en formato UTM o EPSG");
             // Center the model
             model.mesh.position.sub(center);
-            console.log("Model recentered to origin");
+            console.log("Modelo recentrado al origen");
           }
           
           // Check for millimeter scale
           if (size.length() > 10000) {
-            console.warn("Model appears to be in millimeters - scaling down by 0.001");
+            console.warn("El modelo parece estar en milímetros - escalándolo por 0.001");
             model.mesh.scale.setScalar(0.001);
             // Recalculate box after scaling
             box.setFromObject(model.mesh);
             box.getCenter(center);
-            console.log("Model rescaled from mm to m");
+            console.log("Modelo reescalado de mm a m");
           }
         }
         
@@ -147,21 +158,21 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         
         if (model && model.mesh) {
           // Frame the model using our improved utility function
-          setLoadingStatus("Preparing view...");
+          setLoadingStatus("Preparando vista...");
           await frameIFCModel(viewerRef, model.mesh);
         }
         
         setModelLoaded(true);
         setIsLoading(false);
-        setLoadingStatus("Model loaded successfully");
+        setLoadingStatus("Modelo cargado correctamente");
         
         toast({
-          title: "Model Loaded",
-          description: `Successfully loaded ${fileName || 'model'}`,
+          title: "Modelo Cargado",
+          description: `Se ha cargado correctamente ${fileName || 'el modelo'}`,
         });
       } catch (e) {
-        console.error("Error loading IFC model:", e);
-        setError("Failed to load IFC model. The file might be corrupted or in an unsupported format.");
+        console.error("Error al cargar el modelo IFC:", e);
+        setError("Error al cargar el modelo IFC. El archivo podría estar dañado o en un formato no compatible.");
         setErrorDetails(e instanceof Error ? e.message : String(e));
         setIsLoading(false);
         
@@ -177,8 +188,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         
         toast({
           variant: "destructive",
-          title: "Model loading failed",
-          description: "Could not load the IFC model.",
+          title: "Error al cargar el modelo",
+          description: "No se pudo cargar el modelo IFC.",
         });
       }
     };
@@ -191,7 +202,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         try {
           viewer.dispose();
         } catch (e) {
-          console.error("Error disposing viewer:", e);
+          console.error("Error al liberar el visor:", e);
         }
       }
     };

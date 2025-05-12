@@ -42,11 +42,11 @@ const ExampleModelSelector: React.FC<ExampleModelSelectorProps> = ({ onLoadExamp
 
   return (
     <div className="bg-black/20 rounded-md p-4 mt-4 mb-2">
-      <h3 className="text-sm font-medium mb-2">Load Example IFC Model</h3>
+      <h3 className="text-sm font-medium mb-2">Cargar modelo IFC de ejemplo</h3>
       <div className="flex gap-2 flex-col sm:flex-row">
         <Select onValueChange={handleSelectModel}>
           <SelectTrigger className="w-full sm:w-[350px]">
-            <SelectValue placeholder="Select an example model..." />
+            <SelectValue placeholder="Seleccione un modelo de ejemplo..." />
           </SelectTrigger>
           <SelectContent>
             {EXAMPLE_MODELS.map((model) => (
@@ -61,21 +61,19 @@ const ExampleModelSelector: React.FC<ExampleModelSelectorProps> = ({ onLoadExamp
           disabled={!selectedModelUrl}
           className="whitespace-nowrap"
         >
-          Load Example
+          Cargar Ejemplo
         </Button>
       </div>
       
       <div className="mt-3 p-2 bg-amber-950/30 border border-amber-600/30 rounded-md flex items-start gap-2">
         <AlertTriangle className="text-amber-500 h-4 w-4 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-amber-200/80">
-          <span className="font-semibold">Importante:</span> Para que estos modelos se carguen correctamente, 
-          asegúrate de tener los archivos WASM en la carpeta <span className="bg-black/30 px-1 rounded">public/wasm/</span> 
-          de tu proyecto.
+          <span className="font-semibold">Nota:</span> Estos modelos se cargan directamente desde repositorios públicos y pueden tardar en cargarse dependiendo de su tamaño y su conexión a internet.
         </p>
       </div>
       
       <p className="text-xs text-muted-foreground mt-2">
-        These models are loaded directly from public repositories. No upload required.
+        Estos modelos se cargan directamente desde repositorios públicos. No es necesario subir archivos.
       </p>
     </div>
   );
