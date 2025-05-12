@@ -7,11 +7,10 @@ import ViewerHeader from "./viewer/ViewerHeader";
 import ViewerStatusBar from "./viewer/ViewerStatusBar";
 import ViewerPlaceholder from "./viewer/ViewerPlaceholder";
 import ViewerError from "./viewer/ViewerError";
+import { useIFCViewer } from "@/hooks/useIFCViewer";
+import IfcViewerContainer from "./viewer/IfcViewerContainer";
 import LoadingOverlay from "./viewer/LoadingOverlay";
 import ExampleModelSelector from "./viewer/ExampleModelSelector";
-import DirectThreeViewer from "./viewer/DirectThreeViewer";
-// import { useIFCViewer } from "@/hooks/useIFCViewer"; // Comentamos el hook anterior
-// import IfcViewerContainer from "./viewer/IfcViewerContainer"; // Comentamos el contenedor anterior
 
 interface ModelViewerProps {
   fileType: "ifc" | null;
@@ -27,8 +26,23 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
   const [isDragging, setIsDragging] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [exampleUrl, setExampleUrl] = useState<string | undefined>(fileUrl);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // Use our custom hook for IFC viewer
+  const {
+    isLoading,
+    error,
+    errorDetails,
+    isInitialized: viewerInitialized,
+    modelLoaded,
+    loadingStatus,
+    frameAll,
+    retry,
+    debug
+  } = useIFCViewer({
+    containerRef,
+    fileUrl: fileType === 'ifc' ? exampleUrl : undefined,
+    fileName
+  });
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -121,29 +135,20 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
     });
   };
 
-  // Manejadores para eventos del visualizador
-  const handleModelLoad = () => {
-    setStatusMessage("Model loaded: " + (fileName || 'unknown'));
-    setIsLoading(false);
-  };
-
-  const handleModelError = (errorMsg: string) => {
-    setError(`Error al cargar el modelo: ${errorMsg}`);
-    setStatusMessage("Error: " + errorMsg);
-    setIsLoading(false);
-  };
-
-  const retry = () => {
-    setError(null);
-    setIsLoading(true);
-    setStatusMessage("Retrying...");
-    // Forzar una recarga del modelo simulando un cambio en la URL
-    const currentUrl = exampleUrl;
-    setExampleUrl(undefined);
-    setTimeout(() => {
-      setExampleUrl(currentUrl);
-    }, 100);
-  };
+  // Update status message based on viewer state
+  React.useEffect(() => {
+    if (isLoading) {
+      setStatusMessage(loadingStatus);
+    } else if (error) {
+      setStatusMessage("Error: " + error);
+    } else if (modelLoaded) {
+      setStatusMessage("Model loaded: " + fileName);
+    } else if (viewerInitialized) {
+      setStatusMessage("Viewer ready - no model loaded");
+    } else {
+      setStatusMessage("Initializing...");
+    }
+  }, [isLoading, error, modelLoaded, viewerInitialized, fileName, loadingStatus]);
 
   // Show loading overlay if we're loading
   if (isLoading) {
@@ -151,7 +156,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
       <LoadingOverlay 
         isDemoMode={!fileUrl && !exampleUrl} 
         filesCount={fileUrl || exampleUrl ? 1 : 0} 
-        statusMessage={statusMessage} 
+        statusMessage={loadingStatus} 
       />
     );
   }
@@ -163,10 +168,10 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         openFileDialog={openFileDialog} 
         fileInputRef={fileInputRef}
         handleFileInputChange={handleFileInputChange}
-        debug={() => console.log("Debug info:", { fileUrl: exampleUrl, fileName })}
+        debug={debug}
       />
       
-      {!fileName && !error && !exampleUrl && (
+      {!fileName && !error && (
         <ExampleModelSelector onLoadExample={handleLoadExampleModel} />
       )}
       
@@ -180,19 +185,18 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         {error ? (
           <ViewerError 
             error={error} 
-            details="El modelo no se pudo cargar. Verifica que los archivos WASM estén correctamente instalados en la carpeta /public/wasm/"
+            details={errorDetails || undefined}
             navigate={navigate} 
             onRetry={retry}
           />
-        ) : (fileType === 'ifc' || exampleUrl) ? (
-          <div className="h-[600px] relative">
-            <DirectThreeViewer 
-              fileUrl={exampleUrl} 
-              fileName={fileName}
-              onLoad={handleModelLoad}
-              onError={handleModelError}
-            />
-          </div>
+        ) : fileType === 'ifc' || exampleUrl ? (
+          <IfcViewerContainer 
+            containerRef={containerRef}
+            viewerInitialized={viewerInitialized}
+            isDragging={isDragging}
+            modelLoaded={modelLoaded}
+            fileName={fileName}
+          />
         ) : null}
 
         {!fileType && !fileName && !exampleUrl && !error && (
@@ -205,7 +209,7 @@ const ModelViewer: React.FC<ModelViewerProps> = ({ fileType, fileName, fileUrl }
         fileName={fileName || (exampleUrl ? exampleUrl.split('/').pop() : null)}
         fileType={fileType || (exampleUrl ? 'ifc' : null)}
         isLoading={isLoading}
-        info={"IFC Viewer with direct Three.js rendering"}
+        info={"IFC Viewer"}
       />
     </div>
   );
