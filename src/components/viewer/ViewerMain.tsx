@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
 import { useToast } from "@/components/ui/use-toast";
@@ -17,42 +17,14 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
-  const [wasmError, setWasmError] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Verificar que los archivos WASM son accesibles
   useEffect(() => {
-    const checkWasmFiles = async () => {
-      try {
-        // Verificar que podemos acceder a los archivos WASM
-        const wasmResponse = await fetch("/wasm/web-ifc.wasm", { method: 'HEAD' });
-        if (!wasmResponse.ok) {
-          console.error("Error: No se puede acceder al archivo WASM:", wasmResponse.status, wasmResponse.statusText);
-          setWasmError(true);
-          setLoadingError(`No se puede acceder al archivo WASM necesario (status ${wasmResponse.status}). Por favor, asegúrate de que los archivos WASM estén instalados correctamente en la carpeta public/wasm/`);
-          return false;
-        }
-        console.log("✅ Archivos WASM accesibles");
-        return true;
-      } catch (error) {
-        console.error("Error al verificar archivos WASM:", error);
-        setWasmError(true);
-        setLoadingError("No se puede acceder a los archivos WASM necesarios. Por favor, verifica que los archivos estén instalados correctamente.");
-        return false;
-      }
-    };
-
-    checkWasmFiles();
-  }, [setLoadingError]);
-
-  useEffect(() => {
-    if (!containerRef.current || files.length === 0 || wasmError) return;
+    if (!containerRef.current || files.length === 0) return;
 
     const initializeViewer = async () => {
       try {
-        console.log("Inicializando el visor IFC...");
-        
-        // Crear el visor con configuración mejorada
+        // Create the viewer with enhanced settings
         const viewer = new IfcViewerAPI({
           container: containerRef.current!,
           backgroundColor: new THREE.Color(0x222222)
@@ -60,25 +32,21 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         
         viewerRef.current = viewer;
         
-        // Configurar la ruta WASM explícitamente ANTES de cargar cualquier modelo
-        console.log("Configurando ruta WASM a /wasm/");
-        await viewer.IFC.setWasmPath("/wasm/");
-        
-        // Configurar cámara
+        // Set up camera
         viewer.context.ifcCamera.cameraControls.setPosition(10, 10, 10);
         viewer.context.ifcCamera.cameraControls.setTarget(0, 0, 0);
         
-        // Crear una cuadrícula
+        // Create a grid
         const grid = new THREE.GridHelper(50, 50, 0xffffff, 0x888888);
         grid.position.set(0, 0, 0);
         viewer.context.getScene().add(grid);
         
-        // Añadir ejes
+        // Add axes
         const axesHelper = new THREE.AxesHelper(10);
         axesHelper.position.set(0, 0.1, 0);
         viewer.context.getScene().add(axesHelper);
         
-        // Añadir iluminación
+        // Add lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         viewer.context.getScene().add(ambientLight);
         
@@ -86,7 +54,7 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         directionalLight.position.set(5, 10, 7);
         viewer.context.getScene().add(directionalLight);
         
-        // Añadir cubo de referencia en el origen
+        // Add reference cube at origin
         const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
         const material = new THREE.MeshStandardMaterial({ 
           color: 0xff0000, 
@@ -96,87 +64,58 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         cube.position.set(0, 0.3, 0);
         viewer.context.getScene().add(cube);
 
-        // Cargar todos los modelos IFC
+        // Load all IFC models
         for (const file of files.filter(f => f.fileType === 'ifc')) {
           await loadIfcFile(viewer, file);
         }
       } catch (e) {
-        console.error("Error al inicializar el visor:", e);
-        const errorMessage = e instanceof Error ? e.message : String(e);
-        setLoadingError(`Error al inicializar el visor IFC: ${errorMessage}`);
-        
-        // Mostrar información adicional para ayudar a diagnosticar problemas WASM
-        if (errorMessage.includes("wasm") || errorMessage.includes("WebAssembly")) {
-          console.error("Problema detectado con los archivos WASM:");
-          toast({
-            variant: "destructive",
-            title: "Error con archivos WASM",
-            description: "No se pueden cargar los archivos WebAssembly necesarios. Consulta la consola para más detalles.",
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Error al inicializar el visor",
-            description: "No se pudo inicializar el visor 3D.",
-          });
-        }
+        console.error("Error initializing viewer:", e);
+        setLoadingError("Failed to initialize the viewer. Please try again.");
+        toast({
+          variant: "destructive",
+          title: "Viewer initialization failed",
+          description: "Could not initialize the 3D viewer.",
+        });
       }
     };
 
     const loadIfcFile = async (viewer: IfcViewerAPI, file: any) => {
       try {
         if (file.fileUrl) {
-          console.log(`Intentando cargar el modelo IFC: ${file.fileName} desde ${file.fileUrl}`);
-          
-          // Asegurarse de que la ruta WASM esté configurada
+          // Set WebAssembly path before loading
           await viewer.IFC.setWasmPath("/wasm/");
           
-          // Cargar el modelo
+          // Load the model
           const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
           console.log("IFC model loaded:", model);
           
-          if (!model) {
-            throw new Error("El modelo se cargó pero es null o undefined");
-          }
-          
-          // Optimizar el modelo si es necesario
+          // Optimize the model if needed
           if (model && model.mesh) {
             optimizeModel(viewer, model);
           }
           
-          // Notificar al componente padre sobre el modelo cargado
+          // Notify parent component about loaded model
           if (file.id) {
             onModelLoad(file.id, model);
           }
           
           toast({
-            title: "Modelo cargado",
-            description: `Se ha cargado correctamente ${file.fileName}`,
+            title: "Model loaded",
+            description: `Successfully loaded ${file.fileName}`,
           });
         } else {
           await loadExampleModel(viewer);
         }
       } catch (e) {
-        console.error(`Error al cargar el modelo ${file.fileName}:`, e);
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        
-        // Detectar errores específicos relacionados con WASM
-        if (errorMsg.includes("wasm") || errorMsg.includes("WebAssembly")) {
-          setLoadingError(`Error en archivos WASM al cargar ${file.fileName}. Por favor, verifica que los archivos WASM estén instalados correctamente.`);
-        } else {
-          setLoadingError(`Error al cargar el modelo ${file.fileName}: ${errorMsg}`);
-        }
+        console.error(`Error loading model ${file.fileName}:`, e);
+        setLoadingError(`Error loading model ${file.fileName}.`);
       }
     };
     
     const loadExampleModel = async (viewer: IfcViewerAPI) => {
       try {
         const exampleUrl = "https://examples.ifcjs.io/models/ifc/SametLibrary.ifc";
-        console.log("Cargando modelo de ejemplo desde:", exampleUrl);
-        
-        // Asegurarse de que la ruta WASM esté configurada
         await viewer.IFC.setWasmPath("/wasm/");
-        
         const model = await viewer.IFC.loadIfcUrl(exampleUrl);
         
         if (model && model.mesh) {
@@ -184,13 +123,12 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         }
         
         toast({
-          title: "Modelo de ejemplo cargado",
-          description: "Usando modelo IFC de ejemplo",
+          title: "Example model loaded",
+          description: "Using example IFC model",
         });
       } catch (e) {
-        console.error("Error al cargar el ejemplo:", e);
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        setLoadingError(`No se pudo cargar el modelo de ejemplo: ${errorMsg}`);
+        console.error("Failed to load example:", e);
+        setLoadingError("Could not load example model.");
       }
     };
     
@@ -226,17 +164,17 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
 
     initializeViewer();
     
-    // Limpieza
+    // Cleanup
     return () => {
       if (viewerRef.current) {
         try {
           viewerRef.current.dispose();
         } catch (e) {
-          console.error("Error al liberar el visor:", e);
+          console.error("Error disposing viewer:", e);
         }
       }
     };
-  }, [files, setLoadingError, toast, onModelLoad, wasmError]);
+  }, [files, setLoadingError, toast, onModelLoad]);
   
   return (
     <div ref={containerRef} className="w-full h-full" />
