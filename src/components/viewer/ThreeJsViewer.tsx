@@ -27,7 +27,7 @@ export const ThreeJsViewer: React.FC<ThreeJsViewerProps> = ({
   return (
     <div className="w-full h-full">
       <Canvas
-        camera={{ position: [10, 10, 10], fov: 60 }}
+        camera={{ position: [10, 10, 10] as [number, number, number], fov: 60 }}
         style={{ background: '#222222' }}
       >
         {/* Elementos comunes de la escena */}
