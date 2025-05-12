@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import fs from 'fs';
+import type { Connect } from 'vite';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -17,7 +18,7 @@ export default defineConfig(({ mode }) => ({
     },
     // Middleware personalizado para servir archivos WASM con el tipo MIME correcto
     middlewares: [
-      (req, res, next) => {
+      (req: Connect.IncomingMessage, res: Connect.ServerResponse, next: Connect.NextFunction) => {
         if (req.url && req.url.endsWith('.wasm')) {
           // Establecer el tipo MIME correcto para archivos WASM
           res.setHeader('Content-Type', 'application/wasm');
