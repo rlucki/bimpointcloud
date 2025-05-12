@@ -1,7 +1,7 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from '@react-three/drei';
-import { IFCLoader } from 'web-ifc-viewer';
 import { useToast } from '@/components/ui/use-toast';
 
 interface DirectThreeViewerProps {

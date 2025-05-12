@@ -10,7 +10,7 @@ import * as THREE from 'three';
  * @param fitOffset - Factor de offset para el ajuste
  */
 export const fitCameraToObject = (
-  camera: THREE.PerspectiveCamera, // Cambiado de THREE.Camera a THREE.PerspectiveCamera
+  camera: THREE.PerspectiveCamera,
   controls: any,
   object: THREE.Object3D,
   fitOffset = 1.2

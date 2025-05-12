@@ -3,8 +3,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stats } from '@react-three/drei';
-// Importar desde web-ifc-viewer en lugar de three/examples
-import { IFCLoader } from 'web-ifc-viewer';
 import { useToast } from '@/components/ui/use-toast';
 
 interface ThreeJsViewerProps {
