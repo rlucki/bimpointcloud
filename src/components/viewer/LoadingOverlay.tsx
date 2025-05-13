@@ -36,8 +36,8 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             El visor 3D está inicializando los componentes necesarios para visualizar modelos.
           </p>
           
-          <p className="text-yellow-300 text-xs text-center">
-            Módulo WASM desactivado temporalmente - usando modelo de demostración.
+          <p className="text-green-400 text-xs text-center">
+            Usando cargador IFC alternativo - Archivos complejos pueden no visualizarse correctamente.
           </p>
         </div>
       </div>
