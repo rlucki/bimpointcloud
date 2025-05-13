@@ -3,8 +3,10 @@ import React, { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { IfcViewerAPI } from "web-ifc-viewer";
 import { useToast } from "@/components/ui/use-toast";
-import { IFCLoader } from "three-stdlib";
 import { OrbitControls } from "three-stdlib";
+
+// Importamos IFCLoader correctamente
+import { IFCLoader } from "three/examples/jsm/loaders/IFCLoader";
 
 interface ViewerMainProps {
   files: any[];
