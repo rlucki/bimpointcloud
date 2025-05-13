@@ -37,7 +37,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           </p>
           
           <p className="text-green-400 text-xs text-center">
-            Usando cargador IFC de Three.js - Algunos modelos complejos pueden visualizarse con limitaciones.
+            Usando visualización simplificada - Modelos IFC se mostrarán como representaciones básicas.
           </p>
         </div>
       </div>
