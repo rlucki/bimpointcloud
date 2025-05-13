@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Info } from "lucide-react";
+import { Info, AlertCircle } from "lucide-react";
 
 interface LoadingOverlayProps {
   isDemoMode: boolean;
@@ -26,6 +26,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             {statusMessage}
           </p>
         )}
+        
         <div className="mt-6 text-xs text-gray-300 max-w-md mx-auto px-4 bg-black/30 py-4 rounded-md">
           <div className="flex items-center justify-center gap-1 mb-2 text-sm">
             <Info className="h-4 w-4 text-blue-400" /> 
@@ -36,12 +37,18 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             El visor 3D está inicializando los componentes necesarios para visualizar modelos.
           </p>
           
-          <p className="text-amber-400 text-xs text-center">
-            Debido a limitaciones técnicas, los archivos IFC se mostrarán como modelos simplificados.
-          </p>
+          <div className="bg-amber-950/30 border border-amber-600/30 rounded-md p-2 mb-2">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <AlertCircle className="h-4 w-4 text-amber-400" />
+              <p className="text-amber-400 text-xs font-medium">Limitación técnica</p>
+            </div>
+            <p className="text-amber-300 text-xs text-center">
+              Debido a limitaciones técnicas, los archivos IFC se mostrarán como modelos simplificados que no representan exactamente el modelo original.
+            </p>
+          </div>
           
           <p className="text-green-400 text-xs text-center mt-1">
-            Usando visualización simplificada - Los modelos se representarán como objetos básicos.
+            Usando visualización simplificada - Los modelos se representarán como objetos arquitectónicos básicos.
           </p>
         </div>
       </div>
