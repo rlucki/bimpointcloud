@@ -64,10 +64,14 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         cube.position.set(0, 0.3, 0);
         viewer.context.getScene().add(cube);
 
-        // Load all IFC models
-        for (const file of files.filter(f => f.fileType === 'ifc')) {
-          await loadIfcFile(viewer, file);
-        }
+        // Nota: Ya no cargamos modelos IFC por ahora
+        // En su lugar, creamos un modelo de demostración
+        createDemoModel(viewer);
+        
+        toast({
+          title: "Visor inicializado",
+          description: "Visor 3D inicializado sin módulo WASM",
+        });
       } catch (e) {
         console.error("Error initializing viewer:", e);
         setLoadingError("Failed to initialize the viewer. Please try again.");
@@ -79,87 +83,55 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
       }
     };
 
-    const loadIfcFile = async (viewer: IfcViewerAPI, file: any) => {
+    const createDemoModel = (viewer: IfcViewerAPI) => {
       try {
-        if (file.fileUrl) {
-          // Set WebAssembly path before loading
-          await viewer.IFC.setWasmPath("/wasm/");
-          
-          // Load the model
-          const model = await viewer.IFC.loadIfcUrl(file.fileUrl);
-          console.log("IFC model loaded:", model);
-          
-          // Optimize the model if needed
-          if (model && model.mesh) {
-            optimizeModel(viewer, model);
-          }
-          
-          // Notify parent component about loaded model
-          if (file.id) {
-            onModelLoad(file.id, model);
-          }
-          
-          toast({
-            title: "Model loaded",
-            description: `Successfully loaded ${file.fileName}`,
-          });
-        } else {
-          await loadExampleModel(viewer);
-        }
-      } catch (e) {
-        console.error(`Error loading model ${file.fileName}:`, e);
-        setLoadingError(`Error loading model ${file.fileName}.`);
-      }
-    };
-    
-    const loadExampleModel = async (viewer: IfcViewerAPI) => {
-      try {
-        const exampleUrl = "https://examples.ifcjs.io/models/ifc/SametLibrary.ifc";
-        await viewer.IFC.setWasmPath("/wasm/");
-        const model = await viewer.IFC.loadIfcUrl(exampleUrl);
-        
-        if (model && model.mesh) {
-          optimizeModel(viewer, model);
-        }
-        
-        toast({
-          title: "Example model loaded",
-          description: "Using example IFC model",
+        // Create a simple building-like shape
+        const buildingGeometry = new THREE.BoxGeometry(5, 10, 8);
+        const buildingMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0x4f46e5,
+          transparent: true,
+          opacity: 0.7,
+          wireframe: false
         });
+        const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+        building.position.set(0, 5, 0);
+        viewer.context.getScene().add(building);
+        
+        // Add a second building
+        const building2Geometry = new THREE.BoxGeometry(4, 7, 4);
+        const building2Material = new THREE.MeshStandardMaterial({ 
+          color: 0x34d399,
+          transparent: true,
+          opacity: 0.7,
+          wireframe: false
+        });
+        const building2 = new THREE.Mesh(building2Geometry, building2Material);
+        building2.position.set(-8, 3.5, 5);
+        viewer.context.getScene().add(building2);
+        
+        // Add a floor plane
+        const floorGeometry = new THREE.PlaneGeometry(30, 30);
+        const floorMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0xcccccc,
+          side: THREE.DoubleSide
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = Math.PI / 2;
+        floor.position.set(0, 0, 0);
+        viewer.context.getScene().add(floor);
+        
+        // Create a mock model reference for the handler
+        const mockModel = { 
+          mesh: building,
+          id: "demo-model"
+        };
+        
+        // Notify parent component about loaded model
+        onModelLoad("demo-model", mockModel);
+        
       } catch (e) {
-        console.error("Failed to load example:", e);
-        setLoadingError("Could not load example model.");
+        console.error("Error creating demo model:", e);
       }
-    };
-    
-    const optimizeModel = (viewer: IfcViewerAPI, model: any) => {
-      // Handle model position and scale issues
-      const box = new THREE.Box3().setFromObject(model.mesh);
-      const size = new THREE.Vector3();
-      const center = new THREE.Vector3();
-      box.getSize(size);
-      box.getCenter(center);
-      
-      // Fix extremely large coordinates
-      if (box.min.length() > 100000 || box.max.length() > 100000) {
-        model.mesh.position.sub(center);
-      }
-      
-      // Fix millimeter scale
-      if (size.length() > 10000) {
-        model.mesh.scale.setScalar(0.001);
-      }
-      
-      // Adjust camera
-      const camera = viewer.context.getCamera() as THREE.PerspectiveCamera;
-      camera.near = 0.1;
-      camera.far = Math.max(10000, size.length() * 20);
-      camera.updateProjectionMatrix();
-      
-      // Frame model for proper viewing
-      setTimeout(() => {
-        viewer.context.ifcCamera.cameraControls.fitToSphere(model.mesh, true);
-      }, 500);
     };
 
     initializeViewer();

@@ -30,8 +30,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       try {
         if (!containerRef.current) return;
         
-        setLoadingStatus("Creando visor IFC...");
-        console.log("Inicializando visor IFC...");
+        setLoadingStatus("Creando visor 3D...");
+        console.log("Inicializando visor 3D...");
         
         // Create the viewer
         viewer = new IfcViewerAPI({
@@ -40,10 +40,6 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         });
         
         viewerRef.current = viewer;
-        
-        // IMPORTANTE: Configurar la ruta WASM desde el inicio
-        await viewer.IFC.setWasmPath("/wasm/");
-        console.log("Ruta WASM configurada para el parseador IFC");
         
         // Set up camera
         viewer.context.ifcCamera.cameraControls.setPosition(5, 5, 5);
@@ -68,128 +64,89 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         setLoadingStatus("Visor inicializado correctamente");
         setIsInitialized(true);
         
-        // Try to load model if URL is provided
-        if (fileUrl) {
-          loadModel(viewer, fileUrl);
-        } else {
-          // Add a demo cube if no model
-          const geometry = new THREE.BoxGeometry(2, 2, 2);
-          const material = new THREE.MeshStandardMaterial({ 
-            color: 0x4f46e5, 
-            wireframe: true 
-          });
-          const cube = new THREE.Mesh(geometry, material);
-          cube.position.set(0, 1, 0);
-          viewer.context.getScene().add(cube);
-          
-          setIsLoading(false);
-          setLoadingStatus("Modo demo - sin modelo IFC");
-        }
+        // Create demo scene since we're not loading IFC models
+        createDemoScene(viewer);
         
       } catch (e) {
-        console.error("Error inicializando el visor IFC:", e);
-        setError("Error al inicializar el visor IFC. Por favor, inténtelo de nuevo.");
+        console.error("Error inicializando el visor 3D:", e);
+        setError("Error al inicializar el visor 3D. Por favor, inténtelo de nuevo.");
         setErrorDetails(e instanceof Error ? e.message : String(e));
         setIsLoading(false);
         toast({
           variant: "destructive",
           title: "Error de visualización",
-          description: "No se pudo inicializar el visor IFC.",
+          description: "No se pudo inicializar el visor 3D.",
         });
       }
     };
     
-    // Helper function to load model
-    const loadModel = async (viewer: IfcViewerAPI, url: string) => {
+    const createDemoScene = async (viewer: IfcViewerAPI) => {
       try {
-        console.log("Cargando modelo IFC desde URL:", url);
-        setLoadingStatus("Preparando WebAssembly para analizar IFC...");
+        // Create simple demo geometry to represent building
+        setLoadingStatus("Creando modelo de demostración...");
         
-        // Explícitamente verificamos si podemos acceder a los archivos WASM
-        try {
-          const wasmResponse = await fetch("/wasm/web-ifc.wasm", { method: 'HEAD' });
-          if (!wasmResponse.ok) {
-            throw new Error(`No se pudo acceder a los archivos WASM necesarios (${wasmResponse.status})`);
-          }
-          console.log("Archivos WASM accesibles");
-        } catch (wasmError) {
-          console.error("Error al verificar archivos WASM:", wasmError);
-        }
+        // Create a simple building-like shape
+        const buildingGeometry = new THREE.BoxGeometry(5, 10, 8);
+        const buildingMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0x4f46e5,
+          transparent: true,
+          opacity: 0.7,
+          wireframe: false
+        });
+        const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+        building.position.set(0, 5, 0);
+        viewer.context.getScene().add(building);
         
-        setLoadingStatus(`Cargando modelo: ${fileName || url}...`);
-        const model = await viewer.IFC.loadIfcUrl(url);
-        console.log("Modelo IFC cargado correctamente:", model);
+        // Add a second building
+        const building2Geometry = new THREE.BoxGeometry(4, 7, 4);
+        const building2Material = new THREE.MeshStandardMaterial({ 
+          color: 0x34d399,
+          transparent: true,
+          opacity: 0.7,
+          wireframe: false
+        });
+        const building2 = new THREE.Mesh(building2Geometry, building2Material);
+        building2.position.set(-8, 3.5, 5);
+        viewer.context.getScene().add(building2);
         
-        // Calculate model bounds and log them for debugging
-        if (model && model.mesh) {
-          const box = new THREE.Box3().setFromObject(model.mesh);
-          const size = new THREE.Vector3();
-          const center = new THREE.Vector3();
-          box.getSize(size);
-          box.getCenter(center);
-
-          console.table({
-            min: box.min,               // minimum coordinate
-            max: box.max,               // maximum coordinate
-            size,                       // length × height × width
-            center                      // geometric center
-          });
-          
-          // Check for extremely large coordinates (likely UTM or EPSG format)
-          if (box.min.length() > 100000 || box.max.length() > 100000) {
-            console.warn("El modelo tiene coordenadas extremadamente grandes - probablemente en formato UTM o EPSG");
-            // Center the model
-            model.mesh.position.sub(center);
-            console.log("Modelo recentrado al origen");
-          }
-          
-          // Check for millimeter scale
-          if (size.length() > 10000) {
-            console.warn("El modelo parece estar en milímetros - escalándolo por 0.001");
-            model.mesh.scale.setScalar(0.001);
-            // Recalculate box after scaling
-            box.setFromObject(model.mesh);
-            box.getCenter(center);
-            console.log("Modelo reescalado de mm a m");
-          }
-        }
+        // Add a floor plane
+        const floorGeometry = new THREE.PlaneGeometry(30, 30);
+        const floorMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0xcccccc,
+          side: THREE.DoubleSide
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = Math.PI / 2;
+        floor.position.set(0, 0, 0);
+        viewer.context.getScene().add(floor);
         
-        modelRef.current = model;
+        // Create a mock model as stand-in for IFC model
+        const mockModel = {
+          mesh: building
+        };
+        modelRef.current = mockModel;
         
-        if (model && model.mesh) {
-          // Frame the model using our improved utility function
-          setLoadingStatus("Preparando vista...");
-          await frameIFCModel(viewerRef, model.mesh);
-        }
+        // Frame the model
+        await frameIFCModel(viewerRef, building);
         
         setModelLoaded(true);
         setIsLoading(false);
-        setLoadingStatus("Modelo cargado correctamente");
+        setLoadingStatus("Modelo de demostración cargado");
         
         toast({
-          title: "Modelo Cargado",
-          description: `Se ha cargado correctamente ${fileName || 'el modelo'}`,
+          title: "Visor Listo",
+          description: "Se ha creado un modelo de demostración",
         });
       } catch (e) {
-        console.error("Error al cargar el modelo IFC:", e);
-        setError("Error al cargar el modelo IFC. El archivo podría estar dañado o en un formato no compatible.");
+        console.error("Error al crear la escena de demostración:", e);
+        setError("Error al crear la escena de demostración");
         setErrorDetails(e instanceof Error ? e.message : String(e));
         setIsLoading(false);
         
-        // Add a demo cube to show that the viewer is working
-        const geometry = new THREE.BoxGeometry(2, 2, 2);
-        const material = new THREE.MeshStandardMaterial({ 
-          color: 0x4f46e5, 
-          wireframe: true 
-        });
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.set(0, 1, 0);
-        viewer.context.getScene().add(cube);
-        
         toast({
           variant: "destructive",
-          title: "Error al cargar el modelo",
-          description: "No se pudo cargar el modelo IFC.",
+          title: "Error en la escena",
+          description: "No se pudo crear la escena de demostración.",
         });
       }
     };
@@ -208,22 +165,20 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     };
   }, [containerRef, fileUrl, fileName, toast]);
   
-  // Frame all objects in view using the improved method
+  // Frame all objects in view
   const frameAll = async () => {
     if (viewerRef.current) {
       try {
         if (modelRef.current && modelRef.current.mesh) {
-          // Use our improved framing utility
           await frameIFCModel(viewerRef, modelRef.current.mesh);
         } else {
-          // Otherwise frame the whole scene
           const scene = viewerRef.current.context.getScene();
           viewerRef.current.context.ifcCamera.cameraControls.fitToSphere(scene, true);
         }
         console.log("Framed all objects");
         toast({
-          title: "View adjusted",
-          description: "Camera position optimized",
+          title: "Vista ajustada",
+          description: "Posición de cámara optimizada",
         });
       } catch (e) {
         console.error("Error framing objects:", e);
@@ -231,13 +186,12 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     }
   };
   
-  // Reload the viewer and try loading the model again
+  // Reload the viewer
   const retry = async () => {
     setIsLoading(true);
     setError(null);
     setErrorDetails(null);
     
-    // Dispose of the current viewer if it exists
     if (viewerRef.current) {
       try {
         viewerRef.current.dispose();
@@ -247,14 +201,10 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       }
     }
     
-    // Wait a moment to ensure disposal is complete
     setTimeout(() => {
-      // Reset loading state
       setLoadingStatus("Initializing viewer...");
       setIsInitialized(false);
       setModelLoaded(false);
-      
-      // The effect will trigger again and re-initialize the viewer
     }, 500);
   };
   
@@ -264,26 +214,6 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       console.log("Viewer state:", viewerRef.current);
       console.log("Scene:", viewerRef.current.context.getScene());
       console.log("Model:", modelRef.current);
-      
-      // Diagnostic information about the wasm path - CORRECCIÓN DE ERROR
-      console.log("WASM information:");
-      try {
-        console.log("Current WASM path: (checking IFC object)");
-        console.log(viewerRef.current.IFC);
-      } catch (e) {
-        console.log("Could not get WASM path:", e);
-      }
-      
-      // Test if the wasm files are accessible
-      fetch('/wasm/web-ifc.wasm')
-        .then(response => {
-          if (response.ok) {
-            console.log("WASM file accessible:", response.url);
-          } else {
-            console.error("WASM file not found or inaccessible:", response.url);
-          }
-        })
-        .catch(error => console.error("Error checking WASM file:", error));
       
       // Add a visible marker at origin for debugging
       const geometry = new THREE.SphereGeometry(0.2, 32, 32);

@@ -17,7 +17,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
     <div className="min-h-screen bg-[#222222] flex items-center justify-center">
       <div className="text-center max-w-lg px-4">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4 mx-auto"></div>
-        <p className="text-white text-lg">Cargando visor IFC...</p>
+        <p className="text-white text-lg">Cargando visor 3D...</p>
         <p className="text-gray-400 text-sm mt-2">
           {isDemoMode ? "Preparando entorno de demostración" : `Cargando ${filesCount} archivo(s)`}
         </p>
@@ -33,11 +33,11 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           </div>
           
           <p className="text-sm text-center mb-2">
-            El visor IFC está inicializando los componentes necesarios para visualizar modelos 3D.
+            El visor 3D está inicializando los componentes necesarios para visualizar modelos.
           </p>
           
           <p className="text-yellow-300 text-xs text-center">
-            Si la carga tarda demasiado tiempo, puede deberse a la complejidad del modelo o a la conexión de internet.
+            Módulo WASM desactivado temporalmente - usando modelo de demostración.
           </p>
         </div>
       </div>
