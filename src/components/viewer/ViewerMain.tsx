@@ -26,8 +26,8 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
   const [viewInitialized, setViewInitialized] = useState(false);
   const { toast } = useToast();
   
-  // Flag to prevent automatic reframing
-  const autoFramingDisabledRef = useRef(false);
+  // Deshabilitar SIEMPRE el autoencuadre
+  const autoFramingDisabledRef = useRef(true);
 
   // Handle WebGL context loss
   const handleContextLost = () => {
@@ -88,11 +88,9 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
     
-    // Disable auto framing after initialization
-    setTimeout(() => {
-      autoFramingDisabledRef.current = true;
-      console.log("Automatic framing disabled");
-    }, 3000);
+    // Disable auto framing permanently
+    autoFramingDisabledRef.current = true;
+    console.log("[ViewerMain] Auto framing disabled PERMANENTLY");
 
     const initializeViewer = async () => {
       try {
@@ -107,7 +105,8 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
           0.1, 
           1000
         );
-        camera.position.set(10, 10, 10);
+        // Posicionamos la cámara más alejada para mejor visibilidad
+        camera.position.set(25, 25, 25);
         camera.lookAt(0, 0, 0);
         cameraRef.current = camera;
         
@@ -125,17 +124,23 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         // Add context loss/restore event listeners
         renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
         
+        // Añadimos más detección de interacción del usuario
+        renderer.domElement.addEventListener('mousedown', () => {
+          autoFramingDisabledRef.current = true;
+          console.log("[ViewerMain] User interaction detected - mouse");
+        });
+
+        renderer.domElement.addEventListener('touchstart', () => {
+          autoFramingDisabledRef.current = true;
+          console.log("[ViewerMain] User interaction detected - touch");
+        });
+        
         // Add controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.target.set(0, 0, 0);
         controls.update();
         controls.enableDamping = true;
         controls.dampingFactor = 0.05; // Make controls smoother
-        
-        // Important: Add event listener to detect user interaction and disable auto-framing
-        controls.addEventListener('start', () => {
-          autoFramingDisabledRef.current = true;
-        });
         
         controlsRef.current = controls;
         
@@ -253,25 +258,7 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
           if (sceneRef.current) {
             sceneRef.current.add(buildingGroup);
             
-            // Create bounding box
-            const box = new THREE.Box3().setFromObject(buildingGroup);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            
-            // Only set camera position once when model is first loaded
-            // And now only if auto framing is not disabled
-            if (cameraRef.current && controlsRef.current && !autoFramingDisabledRef.current) {
-              const maxDim = Math.max(size.x, size.y, size.z);
-              const distance = maxDim * 2;
-              
-              cameraRef.current.position.set(
-                center.x + distance,
-                center.y + distance / 1.5,
-                center.z + distance
-              );
-              controlsRef.current.target.copy(center);
-              controlsRef.current.update();
-            }
+            // ELIMINADO: Todo el código de posicionamiento automático de la cámara
             
             // Create model reference
             const modelInfo = { 

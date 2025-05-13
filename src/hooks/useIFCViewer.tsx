@@ -24,8 +24,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
   const modelRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
   
-  // Flag to prevent automatic framing
-  const autoFrameDisabledRef = useRef(false);
+  // Flag to prevent automatic framing - SIEMPRE DESHABILITADO
+  const autoFrameDisabledRef = useRef(true);
   
   const { toast } = useToast();
   
@@ -33,11 +33,9 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
   useEffect(() => {
     let cleanup: (() => void) | undefined;
     
-    // Disable auto framing after a short delay
-    setTimeout(() => {
-      autoFrameDisabledRef.current = true;
-      console.log("Auto framing disabled in useIFCViewer");
-    }, 3000);
+    // Disable auto framing INMEDIATAMENTE
+    autoFrameDisabledRef.current = true;
+    console.log("[useIFCViewer] Auto framing disabled IMMEDIATELY");
     
     const initViewer = async () => {
       try {
@@ -58,7 +56,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           0.1, 
           1000
         );
-        camera.position.set(5, 5, 5);
+        // Posición más alejada para evitar recortes
+        camera.position.set(25, 25, 25);
         camera.lookAt(0, 0, 0);
         cameraRef.current = camera;
         
@@ -75,14 +74,19 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         controls.dampingFactor = 0.05;
         controls.screenSpacePanning = true;
         controls.target.set(0, 0, 0);
-        
-        // Important: Listen for user interaction to disable auto framing
-        controls.addEventListener('start', () => {
-          autoFrameDisabledRef.current = true;
-        });
-        
         controls.update();
         controlsRef.current = controls;
+        
+        // Listeners adicionales y firmes para detectar interacción
+        renderer.domElement.addEventListener('mousedown', () => {
+          autoFrameDisabledRef.current = true;
+          console.log("[useIFCViewer] Auto framing disabled by mouse interaction");
+        });
+        
+        renderer.domElement.addEventListener('touchstart', () => {
+          autoFrameDisabledRef.current = true;
+          console.log("[useIFCViewer] Auto framing disabled by touch interaction");
+        });
         
         // Add grid for better spatial reference
         const grid = new THREE.GridHelper(50, 50, 0xffffff, 0x888888);
@@ -214,28 +218,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         // Add the group to the scene
         sceneRef.current.add(buildingGroup);
         
-        // Create a box to calculate size and center
-        const box = new THREE.Box3().setFromObject(buildingGroup);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        
-        // Only position camera if auto framing is not disabled
-        if (!autoFrameDisabledRef.current) {
-          // Calculate distance for camera
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const distance = maxDim * 2;
-          
-          // Position camera
-          if (cameraRef.current && controlsRef.current) {
-            cameraRef.current.position.set(
-              center.x + distance,
-              center.y + distance / 1.5,
-              center.z + distance
-            );
-            controlsRef.current.target.copy(center);
-            controlsRef.current.update();
-          }
-        }
+        // ELIMINADO: todo el código de posicionamiento automático de la cámara
         
         // Store model reference
         modelRef.current = {
@@ -295,12 +278,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           mesh: building
         };
         
-        // Position camera to see the demo scene
-        if (cameraRef.current && controlsRef.current) {
-          cameraRef.current.position.set(15, 15, 15);
-          controlsRef.current.target.set(0, 5, 0);
-          controlsRef.current.update();
-        }
+        // ELIMINADO: todo el código de posicionamiento automático de la cámara
+        // La cámara ya fue posicionada al inicio y no la vamos a mover más
         
         setModelLoaded(true);
         setIsLoading(false);
@@ -334,59 +313,14 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     };
   }, [containerRef, fileUrl, fileName, toast]);
   
-  // Frame all objects - modified to respect the auto frame disabled flag
+  // Frame all objects - ahora simplemente muestra un mensaje de que está deshabilitada
   const frameAll = async () => {
-    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return;
-    
-    try {
-      // Set the auto frame disabled flag to prevent future auto framing
-      autoFrameDisabledRef.current = true;
-      
-      // Find all visible meshes in the scene
-      const meshes: THREE.Object3D[] = [];
-      sceneRef.current.traverse((object) => {
-        if (object.type === 'Mesh' && object.visible) {
-          meshes.push(object);
-        }
-      });
-      
-      if (meshes.length === 0) return;
-      
-      // Create a bounding box for all meshes
-      const boundingBox = new THREE.Box3();
-      
-      meshes.forEach((mesh) => {
-        boundingBox.expandByObject(mesh);
-      });
-      
-      // Calculate center and size
-      const center = new THREE.Vector3();
-      boundingBox.getCenter(center);
-      
-      const size = new THREE.Vector3();
-      boundingBox.getSize(size);
-      
-      // Calculate the distance based on the size of the object
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const fov = cameraRef.current.fov * (Math.PI / 180);
-      const distance = Math.abs(maxDim / (2 * Math.tan(fov / 2))) * 1.5;
-      
-      // Position the camera to look at the center of the object
-      cameraRef.current.position.copy(center);
-      cameraRef.current.position.z += distance;
-      cameraRef.current.lookAt(center);
-      
-      // Update controls
-      controlsRef.current.target.copy(center);
-      controlsRef.current.update();
-      
-      toast({
-        title: "Vista ajustada",
-        description: "Posición de cámara optimizada",
-      });
-    } catch (e) {
-      console.error("Error framing objects:", e);
-    }
+    // Informamos al usuario que la función está deshabilitada
+    toast({
+      title: "Autoposicionamiento deshabilitado",
+      description: "El reencuadre automático está desactivado para permitir movimiento libre",
+    });
+    console.log("[useIFCViewer] frameAll called but ignored - auto framing is disabled");
   };
   
   // Reload the viewer

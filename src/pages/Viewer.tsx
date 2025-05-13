@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
@@ -33,7 +34,9 @@ const Viewer = () => {
   const [visibleFiles, setVisibleFiles] = useState<{[key: string]: boolean}>({});
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [lastFrameTime, setLastFrameTime] = useState(0);
-  const [userInteracted, setUserInteracted] = useState(false);
+  
+  // IMPORTANTE: Siempre suponemos que ya hubo interacción para evitar auto encuadre
+  const [userInteracted, setUserInteracted] = useState(true);
   const frameTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Model references
@@ -75,21 +78,10 @@ const Viewer = () => {
     });
     setVisibleFiles(initialVisibility);
     
-    // Add event listener to detect first user interaction
-    const handleUserInteraction = () => {
-      setUserInteracted(true);
-      // Clean up after capturing first interaction
-      document.removeEventListener('mousedown', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-    };
+    // Explícitamente marcar como que ya hubo interacción
+    setUserInteracted(true);
+    console.log("[Viewer] User interaction flag set to true on mount");
     
-    document.addEventListener('mousedown', handleUserInteraction);
-    document.addEventListener('touchstart', handleUserInteraction);
-    
-    return () => {
-      document.removeEventListener('mousedown', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-    };
   }, []);
   
   // Check for files and simulate loading
@@ -150,33 +142,13 @@ const Viewer = () => {
     }
   };
 
-  // Frame all objects - with much longer cooldown to prevent too frequent reframing
+  // Frame all objects - completamente deshabilitado
   const handleFrameAll = () => {
-    const now = Date.now();
-    
-    // Cancel any pending frame operation
-    if (frameTimeoutRef.current) {
-      clearTimeout(frameTimeoutRef.current);
-    }
-    
-    // Only allow framing once every 10 seconds (increased from 2 seconds)
-    // And only allow framing if initiated by user click
-    if (now - lastFrameTime > 10000) {
-      setLastFrameTime(now);
-      console.log("Frame all objects - user triggered");
-      
-      // Show toast
-      toast({
-        title: "Ajuste de vista",
-        description: "Encuadrando todos los objetos en la vista",
-      });
-      
-      // Introduce a slight delay before framing to give UI time to update
-      frameTimeoutRef.current = setTimeout(() => {
-        // Implementation would go here if needed
-        frameTimeoutRef.current = null;
-      }, 100);
-    }
+    toast({
+      title: "Autoposicionamiento deshabilitado",
+      description: "El reencuadre automático está completamente desactivado para permitir movimiento libre",
+    });
+    console.log("[Viewer] handleFrameAll called but disabled");
   };
   
   // Handle debug
@@ -209,12 +181,7 @@ const Viewer = () => {
   }
   
   return (
-    <div 
-      className="min-h-screen flex flex-col bg-[#222222]"
-      // Add these handlers to prevent auto-framing on user interaction
-      onMouseDown={() => setUserInteracted(true)}
-      onTouchStart={() => setUserInteracted(true)}
-    >
+    <div className="min-h-screen flex flex-col bg-[#222222]">
       {/* Top Navigation Bar */}
       <header className="bg-[#333333] border-b border-[#444444] h-12 flex items-center justify-between px-4">
         <div className="flex items-center">
