@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
@@ -142,13 +141,16 @@ const Viewer = () => {
     }
   };
 
-  // Frame all objects - completamente deshabilitado
+  // Frame all objects - COMPLETAMENTE DESHABILITADO
   const handleFrameAll = () => {
+    console.log("Frame All está completamente deshabilitado");
+    // No hacemos nada aquí - está completamente desactivado
+    
+    // Notificamos al usuario que está deshabilitado
     toast({
-      title: "Autoposicionamiento deshabilitado",
-      description: "El reencuadre automático está completamente desactivado para permitir movimiento libre",
+      title: "Función desactivada",
+      description: "El reencuadre automático ha sido desactivado permanentemente.",
     });
-    console.log("[Viewer] handleFrameAll called but disabled");
   };
   
   // Handle debug

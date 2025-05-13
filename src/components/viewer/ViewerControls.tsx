@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Move, MaximizeIcon, MinimizeIcon, Settings } from "lucide-react";
+import { MaximizeIcon, MinimizeIcon, Settings } from "lucide-react";
 
 interface ViewerControlsProps {
   onFrameAll: () => void;
@@ -18,15 +18,7 @@ const ViewerControls: React.FC<ViewerControlsProps> = ({
 }) => {
   return (
     <div className="absolute top-4 right-4 flex flex-col space-y-2 pointer-events-auto">
-      <Button 
-        onClick={onFrameAll}
-        variant="secondary" 
-        size="icon"
-        title="Frame all objects"
-        className="bg-[#333333] text-white hover:bg-[#444444] border border-[#444444]"
-      >
-        <Move className="h-5 w-5" />
-      </Button>
+      {/* Eliminamos el botón de Frame All para evitar que el usuario lo use */}
       
       <Button 
         onClick={onToggleFullscreen}

@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useToast } from "@/components/ui/use-toast";
@@ -93,12 +94,13 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         sceneRef.current = scene;
         
         const camera = new THREE.PerspectiveCamera(
-          75, 
+          60, 
           containerRef.current.clientWidth / containerRef.current.clientHeight, 
           0.1, 
           1000
         );
-        camera.position.set(10, 10, 10);
+        // Posición inicial más alejada
+        camera.position.set(30, 30, 30);
         camera.lookAt(0, 0, 0);
         cameraRef.current = camera;
         
@@ -122,15 +124,34 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         controls.update();
         controls.enableDamping = true;
         controls.dampingFactor = 0.05; // Make controls smoother
+        controls.autoRotate = false;
+        
+        // Desactivar cualquier comportamiento automático
+        controls.enablePan = true;
+        controls.enableRotate = true;
+        controls.enableZoom = true;
+        controls.autoRotateSpeed = 0;
+        
+        // Eliminar cualquier límite de cámara
+        controls.minDistance = 0.1;
+        controls.maxDistance = 1000;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+        
+        // Desactivar cualquier comportamiento de ajuste automático
+        controls.enabled = true;
+        controls.zoomSpeed = 1.0;
+        controls.rotateSpeed = 1.0;
+        
         controlsRef.current = controls;
         
         // Create a grid
-        const grid = new THREE.GridHelper(50, 50, 0xffffff, 0x888888);
+        const grid = new THREE.GridHelper(100, 100, 0xffffff, 0x888888);
         grid.position.set(0, 0, 0);
         scene.add(grid);
         
         // Add axes
-        const axesHelper = new THREE.AxesHelper(10);
+        const axesHelper = new THREE.AxesHelper(20);
         axesHelper.position.set(0, 0.1, 0);
         scene.add(axesHelper);
         
@@ -142,7 +163,7 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         directionalLight.position.set(5, 10, 7);
         scene.add(directionalLight);
 
-        // Animation loop - only update controls, not camera position
+        // Animation loop - solo actualiza los controles, nada más
         const animate = () => {
           animationRef.current = requestAnimationFrame(animate);
           if (controlsRef.current) {
@@ -238,24 +259,8 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
           if (sceneRef.current) {
             sceneRef.current.add(buildingGroup);
             
-            // Create bounding box
-            const box = new THREE.Box3().setFromObject(buildingGroup);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            
-            // Only set camera position once when model is first loaded
-            if (cameraRef.current && controlsRef.current && !viewInitialized) {
-              const maxDim = Math.max(size.x, size.y, size.z);
-              const distance = maxDim * 2;
-              
-              cameraRef.current.position.set(
-                center.x + distance,
-                center.y + distance / 1.5,
-                center.z + distance
-              );
-              controlsRef.current.target.copy(center);
-              controlsRef.current.update();
-            }
+            // COMPLETAMENTE ELIMINADO: Código de cálculo de bounding box y posicionamiento automático
+            // No hacemos NADA con la cámara aquí
             
             // Create model reference
             const modelInfo = { 
@@ -406,6 +411,9 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         floor.rotation.x = Math.PI / 2;
         floor.position.set(0, 0, 0);
         sceneRef.current.add(floor);
+        
+        // COMPLETAMENTE ELIMINADO: Código de cálculo de bounding box y posicionamiento automático
+        // No hacemos NADA con la cámara aquí
         
         // Create a mock model reference for the handler
         const mockModel = { 
