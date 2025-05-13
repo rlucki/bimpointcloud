@@ -36,8 +36,12 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             El visor 3D está inicializando los componentes necesarios para visualizar modelos.
           </p>
           
-          <p className="text-green-400 text-xs text-center">
-            Usando visualización simplificada - Modelos IFC se mostrarán como representaciones básicas.
+          <p className="text-amber-400 text-xs text-center">
+            Debido a limitaciones técnicas, los archivos IFC se mostrarán como modelos simplificados.
+          </p>
+          
+          <p className="text-green-400 text-xs text-center mt-1">
+            Usando visualización simplificada - Los modelos se representarán como objetos básicos.
           </p>
         </div>
       </div>
