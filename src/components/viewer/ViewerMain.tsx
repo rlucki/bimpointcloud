@@ -23,6 +23,7 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
   const controlsRef = useRef<any>(null);
   const animationRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewInitialized, setViewInitialized] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -55,6 +56,7 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.target.set(0, 0, 0);
         controls.update();
+        controls.enableDamping = true;
         controlsRef.current = controls;
         
         // Create a grid
@@ -75,10 +77,12 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         directionalLight.position.set(5, 10, 7);
         scene.add(directionalLight);
 
-        // Animation loop
+        // Animation loop - only update controls, not camera position
         const animate = () => {
           animationRef.current = requestAnimationFrame(animate);
-          controls.update();
+          if (controlsRef.current) {
+            controlsRef.current.update();
+          }
           renderer.render(scene, camera);
         };
         animate();
@@ -104,6 +108,8 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
           renderer,
           controls
         };
+        
+        setViewInitialized(true);
         
         // Check if we have files to load
         if (files.length > 0) {
@@ -163,8 +169,8 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             
-            // Set camera position
-            if (cameraRef.current && controlsRef.current) {
+            // Only set camera position once when model is first loaded
+            if (cameraRef.current && controlsRef.current && !viewInitialized) {
               const maxDim = Math.max(size.x, size.y, size.z);
               const distance = maxDim * 2;
               

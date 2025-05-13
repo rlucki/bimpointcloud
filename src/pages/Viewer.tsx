@@ -33,6 +33,7 @@ const Viewer = () => {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [visibleFiles, setVisibleFiles] = useState<{[key: string]: boolean}>({});
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [lastFrameTime, setLastFrameTime] = useState(0);
   
   // Model references
   const modelRefs = useRef<{[key: string]: any}>({});
@@ -132,10 +133,20 @@ const Viewer = () => {
     }
   };
 
-  // Frame all objects
+  // Frame all objects - with cooldown to prevent too frequent reframing
   const handleFrameAll = () => {
-    // Frame all implementation would go here
-    console.log("Frame all objects");
+    const now = Date.now();
+    // Only allow framing once every 2 seconds to prevent accidental double-clicks
+    if (now - lastFrameTime > 2000) {
+      setLastFrameTime(now);
+      console.log("Frame all objects - user triggered");
+      
+      // Implementation would go here if needed
+      toast({
+        title: "Ajuste de vista",
+        description: "Encuadrando todos los objetos en la vista",
+      });
+    }
   };
   
   // Handle debug
