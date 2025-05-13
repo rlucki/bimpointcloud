@@ -34,6 +34,7 @@ const Viewer = () => {
   const [visibleFiles, setVisibleFiles] = useState<{[key: string]: boolean}>({});
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [lastFrameTime, setLastFrameTime] = useState(0);
+  const frameTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Model references
   const modelRefs = useRef<{[key: string]: any}>({});
@@ -136,16 +137,28 @@ const Viewer = () => {
   // Frame all objects - with cooldown to prevent too frequent reframing
   const handleFrameAll = () => {
     const now = Date.now();
+    
+    // Cancel any pending frame operation
+    if (frameTimeoutRef.current) {
+      clearTimeout(frameTimeoutRef.current);
+    }
+    
     // Only allow framing once every 2 seconds to prevent accidental double-clicks
     if (now - lastFrameTime > 2000) {
       setLastFrameTime(now);
       console.log("Frame all objects - user triggered");
       
-      // Implementation would go here if needed
+      // Show toast
       toast({
         title: "Ajuste de vista",
         description: "Encuadrando todos los objetos en la vista",
       });
+      
+      // Introduce a slight delay before framing to give UI time to update
+      frameTimeoutRef.current = setTimeout(() => {
+        // Implementation would go here if needed
+        frameTimeoutRef.current = null;
+      }, 100);
     }
   };
   
@@ -162,6 +175,16 @@ const Viewer = () => {
   const goBack = () => {
     navigate('/');
   };
+  
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      // Clear any pending timeouts
+      if (frameTimeoutRef.current) {
+        clearTimeout(frameTimeoutRef.current);
+      }
+    };
+  }, []);
   
   // If loading, show loader
   if (isLoading) {
