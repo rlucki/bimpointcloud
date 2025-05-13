@@ -4,9 +4,6 @@ import * as THREE from "three";
 import { useToast } from "@/components/ui/use-toast";
 import { OrbitControls } from "three-stdlib";
 
-// Usamos directamente THREE para crear un IFC loader simulado
-// ya que three-stdlib no proporciona IFCLoader y el import directo falla
-
 interface ViewerMainProps {
   files: any[];
   setLoadingError: (error: string | null) => void;
@@ -112,7 +109,7 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         if (files.length > 0) {
           const file = files[0];
           if (file.fileUrl) {
-            simulateLoadIFCModel(file.fileUrl, file.fileName, file.id || 'model-1');
+            createSimpleModelFromUrl(file.fileUrl, file.fileName, file.id || 'model-1');
           } else {
             createDemoModel();
           }
@@ -131,20 +128,20 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
       }
     };
 
-    // Simulamos la carga de un IFC con un modelo arquitectónico simplificado
-    const simulateLoadIFCModel = async (url: string, fileName: string, fileId: string) => {
+    // Simple model creation based on URL without using IFC loader
+    const createSimpleModelFromUrl = async (url: string, fileName: string, fileId: string) => {
       try {
         setIsLoading(true);
         toast({
-          title: "Cargando modelo",
-          description: `Cargando ${fileName || 'modelo'} desde URL...`,
+          title: "Representando modelo",
+          description: `Creando una representación simple para ${fileName || 'el modelo'}...`,
         });
 
-        console.log("Simulando carga de IFC desde:", url);
+        console.log("Creando representación simple para:", url);
         
-        // Tiempo para simular la carga del modelo
+        // Short delay to simulate processing
         setTimeout(() => {
-          // Limpiar escena previa
+          // Clean existing models
           if (sceneRef.current) {
             sceneRef.current.children = sceneRef.current.children.filter(
               child => child.type === "GridHelper" || 
@@ -154,188 +151,141 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
             );
           }
           
-          createArchitecturalModelFromIfc(fileId, fileName);
+          // Create a basic building representation
+          const buildingGroup = createBuildingRepresentation(fileName || url.split('/').pop() || 'unknown');
           
-          toast({
-            title: "Modelo visualizado",
-            description: `${fileName || 'Modelo'} representado en modo simplificado`,
-            variant: "default"
-          });
-        }, 2000);
+          // Add to scene
+          if (sceneRef.current) {
+            sceneRef.current.add(buildingGroup);
+            
+            // Create bounding box
+            const box = new THREE.Box3().setFromObject(buildingGroup);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            
+            // Set camera position
+            if (cameraRef.current && controlsRef.current) {
+              const maxDim = Math.max(size.x, size.y, size.z);
+              const distance = maxDim * 2;
+              
+              cameraRef.current.position.set(
+                center.x + distance,
+                center.y + distance / 1.5,
+                center.z + distance
+              );
+              controlsRef.current.target.copy(center);
+              controlsRef.current.update();
+            }
+            
+            // Create model reference
+            const modelInfo = { 
+              mesh: buildingGroup,
+              id: fileId,
+              name: fileName || "Representación Simple"
+            };
+            
+            // Notify parent
+            onModelLoad(fileId, modelInfo);
+            setIsLoading(false);
+            
+            toast({
+              title: "Modelo representado",
+              description: `Representación simplificada creada para ${fileName || 'el archivo'}`,
+              variant: "default"
+            });
+          }
+        }, 1500);
         
       } catch (error) {
-        console.error('Error al simular carga de archivo IFC:', error);
+        console.error('Error al crear representación simple:', error);
         createDemoModel();
-        setLoadingError(`Error en la simulación de carga de archivo IFC: ${error}`);
+        setLoadingError(`Error al crear representación: ${error}`);
         toast({
           variant: "destructive",
-          title: "Error de carga",
-          description: "Error al simular la carga del modelo. Mostrando modelo de demostración.",
+          title: "Error de representación",
+          description: "No se pudo crear la representación. Mostrando modelo de demostración.",
         });
       }
     };
 
-    // Crear un modelo arquitectónico simplificado basado en un IFC
-    const createArchitecturalModelFromIfc = (fileId: string, fileName: string) => {
-      try {
-        if (!sceneRef.current) return;
+    // Create a simple building representation
+    const createBuildingRepresentation = (name: string) => {
+      const group = new THREE.Group();
+      group.name = name;
+      
+      // Main building - colorize based on file name hash
+      const hash = hashString(name);
+      const color = new THREE.Color(
+        ((hash & 0xFF0000) >> 16) / 255,
+        ((hash & 0x00FF00) >> 8) / 255,
+        (hash & 0x0000FF) / 255
+      );
+      
+      // Main structure
+      const mainGeometry = new THREE.BoxGeometry(8, 12, 10);
+      const mainMaterial = new THREE.MeshStandardMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.7,
+      });
+      const mainBuilding = new THREE.Mesh(mainGeometry, mainMaterial);
+      mainBuilding.position.set(0, 6, 0);
+      group.add(mainBuilding);
+      
+      // Add a roof
+      const roofGeometry = new THREE.ConeGeometry(6, 3, 4);
+      const roofMaterial = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
+      const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+      roof.position.set(0, 13.5, 0);
+      roof.rotation.y = Math.PI / 4;
+      group.add(roof);
+      
+      // Add base/floor
+      const baseGeometry = new THREE.BoxGeometry(12, 1, 14);
+      const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x6b7280 });
+      const base = new THREE.Mesh(baseGeometry, baseMaterial);
+      base.position.set(0, -0.5, 0);
+      group.add(base);
+      
+      // Add filename text
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, 256, 64);
+        ctx.font = '24px Arial';
+        ctx.fillStyle = 'black';
+        ctx.textAlign = 'center';
+        ctx.fillText(name.substring(0, 20), 128, 40);
         
-        const group = new THREE.Group();
-        group.name = "IFC_Model_Simplified";
-        
-        // Edificio principal - más elaborado que el modelo demo estándar
-        const mainBuildingGeo = new THREE.BoxGeometry(8, 12, 10);
-        const mainBuildingMat = new THREE.MeshStandardMaterial({
-          color: 0x3b82f6,
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.MeshBasicMaterial({ 
+          map: texture,
           transparent: true,
-          opacity: 0.8,
-        });
-        const mainBuilding = new THREE.Mesh(mainBuildingGeo, mainBuildingMat);
-        mainBuilding.position.set(0, 6, 0);
-        group.add(mainBuilding);
-        
-        // Techo 
-        const roofGeo = new THREE.ConeGeometry(6, 3, 4);
-        const roofMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
-        const roof = new THREE.Mesh(roofGeo, roofMat);
-        roof.position.set(0, 13.5, 0);
-        roof.rotation.y = Math.PI / 4;
-        group.add(roof);
-        
-        // Planta baja / base
-        const baseGeo = new THREE.BoxGeometry(12, 1, 14);
-        const baseMat = new THREE.MeshStandardMaterial({ color: 0x6b7280 });
-        const base = new THREE.Mesh(baseGeo, baseMat);
-        base.position.set(0, -0.5, 0);
-        group.add(base);
-        
-        // Ventanas - primera fila
-        const windowMaterial = new THREE.MeshStandardMaterial({
-          color: 0x90cdf4,
-          transparent: true,
-          opacity: 0.8,
-        });
-        
-        // Crear ventanas en filas
-        for (let floor = 1; floor <= 3; floor++) {
-          for (let i = -2.5; i <= 2.5; i += 1.5) {
-            // Ventanas frontales
-            const windowGeom = new THREE.BoxGeometry(1, 1.5, 0.1);
-            const windowMesh = new THREE.Mesh(windowGeom, windowMaterial);
-            windowMesh.position.set(i, floor * 3, 5.05);
-            group.add(windowMesh);
-            
-            // Ventanas traseras
-            const backWindow = windowMesh.clone();
-            backWindow.position.z = -5.05;
-            group.add(backWindow);
-            
-            // Ventanas laterales si hay espacio
-            if (i > -2.5 && i < 2.5) {
-              const sideWindow = windowMesh.clone();
-              sideWindow.rotation.y = Math.PI / 2;
-              sideWindow.position.set(4.05, floor * 3, i);
-              group.add(sideWindow);
-              
-              const otherSideWindow = sideWindow.clone();
-              otherSideWindow.position.x = -4.05;
-              group.add(otherSideWindow);
-            }
-          }
-        }
-        
-        // Entrada
-        const doorGeo = new THREE.BoxGeometry(2, 3, 0.2);
-        const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
-        const door = new THREE.Mesh(doorGeo, doorMat);
-        door.position.set(0, 1.5, 5.1);
-        group.add(door);
-        
-        // Escalones
-        const stepsGeo = new THREE.BoxGeometry(3, 0.5, 1);
-        const stepsMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af });
-        const steps = new THREE.Mesh(stepsGeo, stepsMat);
-        steps.position.set(0, 0.25, 5.6);
-        group.add(steps);
-        
-        // Terreno / Suelo
-        const groundGeo = new THREE.CircleGeometry(15, 32);
-        const groundMat = new THREE.MeshStandardMaterial({
-          color: 0x4ade80,
           side: THREE.DoubleSide
         });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.y = -0.01;
-        group.add(ground);
         
-        // Añadir algunos árboles
-        for (let i = 0; i < 6; i++) {
-          const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
-          const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
-          const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-          
-          const leavesGeo = new THREE.ConeGeometry(1, 2, 8);
-          const leavesMat = new THREE.MeshStandardMaterial({ color: 0x22c55e });
-          const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-          leaves.position.y = 1.8;
-          
-          const tree = new THREE.Group();
-          tree.add(trunk);
-          tree.add(leaves);
-          
-          // Posición aleatoria pero fuera del edificio
-          const angle = Math.random() * Math.PI * 2;
-          const distance = 8 + Math.random() * 6;
-          tree.position.set(
-            Math.cos(angle) * distance,
-            0.75,
-            Math.sin(angle) * distance
-          );
-          
-          group.add(tree);
-        }
-        
-        // Añadir el grupo a la escena
-        if (sceneRef.current) {
-          sceneRef.current.add(group);
-          
-          // Crear una bounding box para calcular el centro y el tamaño
-          const box = new THREE.Box3().setFromObject(group);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
-          
-          // Calcular la distancia para ver correctamente el modelo
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const distance = maxDim * 1.5;
-          
-          // Posicionar la cámara para mirar al modelo
-          if (cameraRef.current && controlsRef.current) {
-            cameraRef.current.position.set(
-              center.x + distance,
-              center.y + distance / 1.2,
-              center.z + distance
-            );
-            controlsRef.current.target.copy(center);
-            controlsRef.current.update();
-          }
-        }
-        
-        // Crear referencia al modelo para el manejador
-        const modelInfo = { 
-          mesh: group,
-          id: fileId,
-          name: fileName || "Modelo IFC Simplificado"
-        };
-        
-        // Notificar al componente padre sobre el modelo cargado
-        onModelLoad(fileId, modelInfo);
-        setIsLoading(false);
-      } catch (e) {
-        console.error("Error creating architectural model:", e);
-        createDemoModel();
-        setLoadingError("Error al crear el modelo arquitectónico");
+        const labelGeometry = new THREE.PlaneGeometry(4, 1);
+        const label = new THREE.Mesh(labelGeometry, material);
+        label.position.set(0, 15, 0);
+        label.rotation.x = -Math.PI / 4;
+        group.add(label);
       }
+      
+      return group;
+    };
+    
+    // Simple hash function for file names
+    const hashString = (str: string) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+      }
+      // Ensure positive value
+      return Math.abs(hash) % 0xFFFFFF;
     };
 
     const createDemoModel = () => {

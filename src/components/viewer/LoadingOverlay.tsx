@@ -34,21 +34,22 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           </div>
           
           <p className="text-sm text-center mb-2">
-            El visor 3D está inicializando los componentes necesarios para visualizar modelos.
+            El visor 3D está creando una representación básica de los archivos IFC.
           </p>
           
           <div className="bg-amber-950/30 border border-amber-600/30 rounded-md p-2 mb-2">
             <div className="flex items-center justify-center gap-1 mb-1">
               <AlertCircle className="h-4 w-4 text-amber-400" />
-              <p className="text-amber-400 text-xs font-medium">Limitación técnica</p>
+              <p className="text-amber-400 text-xs font-medium">Visualización simplificada</p>
             </div>
             <p className="text-amber-300 text-xs text-center">
-              Debido a limitaciones técnicas, los archivos IFC se mostrarán como modelos simplificados que no representan exactamente el modelo original.
+              Esta versión no carga el contenido real de los archivos IFC. En su lugar, crea una representación
+              genérica basada en el nombre del archivo.
             </p>
           </div>
           
           <p className="text-green-400 text-xs text-center mt-1">
-            Usando visualización simplificada - Los modelos se representarán como objetos arquitectónicos básicos.
+            Modo básico - Sin carga de archivos - Sin uso de WASM
           </p>
         </div>
       </div>

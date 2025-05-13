@@ -1,11 +1,8 @@
+
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
-import { IfcViewerAPI } from "web-ifc-viewer";
 import { useToast } from "@/components/ui/use-toast";
 import { OrbitControls } from "three-stdlib";
-
-// Eliminamos la importación de IFCLoader y usamos un método alternativo
-import { frameIFCModel } from "@/components/viewer/ViewerUtils";
 
 interface UseIFCViewerProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -38,8 +35,8 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       try {
         if (!containerRef.current) return;
         
-        setLoadingStatus("Creando visor 3D...");
-        console.log("Inicializando visor 3D alternativo...");
+        setLoadingStatus("Creando visor 3D básico...");
+        console.log("Inicializando visor 3D simple...");
         
         // Create Three.js scene
         const scene = new THREE.Scene();
@@ -142,9 +139,9 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           controlsRef.current = null;
         };
         
-        // Load model if URL provided, otherwise create demo scene
+        // Create simple box if URL provided, otherwise create demo scene
         if (fileUrl) {
-          simulateIFCModelLoading(fileUrl);
+          createSimpleIfcRepresentation(fileUrl);
         } else {
           createDemoScene();
         }
@@ -162,127 +159,57 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       }
     };
     
-    // Simulación de carga de IFC sin IFCLoader
-    const simulateIFCModelLoading = async (url: string) => {
+    // Simple representation for IFC files - just creates a colored box with the name
+    const createSimpleIfcRepresentation = (url: string) => {
       try {
         if (!sceneRef.current) return;
         
-        setLoadingStatus("Simulando carga de modelo IFC...");
-        console.log("Simulando carga de IFC desde URL:", url);
+        setLoadingStatus("Creando representación simple del IFC...");
+        console.log("Creando representación simple desde URL:", url);
         
-        // En lugar de usar IFCLoader, simulamos la carga creando un modelo básico
-        setTimeout(() => {
-          // Carga simulada completada
-          createSimulatedBuildingFromIFC();
-        }, 2000);
-        
-      } catch (e) {
-        console.error("Error al simular la carga del modelo IFC:", e);
-        createDemoScene();
-        setError("No se pudo cargar el modelo IFC");
-        setErrorDetails(e instanceof Error ? e.message : String(e));
-        toast({
-          variant: "destructive",
-          title: "Error de carga",
-          description: "Error al cargar el modelo. Mostrando modelo de demostración.",
-        });
-      }
-    };
-
-    // Crear un modelo simulado como si viniera del archivo IFC
-    const createSimulatedBuildingFromIFC = () => {
-      try {
-        if (!sceneRef.current) return;
-        
-        // Limpiamos la escena de modelos demo anteriores
+        // Clear previous models
         sceneRef.current.children = sceneRef.current.children.filter(
           child => child.type === "GridHelper" || 
-                    child.type === "AxesHelper" ||
-                    child.type === "DirectionalLight" ||
-                    child.type === "AmbientLight"
+                  child.type === "AxesHelper" ||
+                  child.type === "DirectionalLight" ||
+                  child.type === "AmbientLight"
         );
         
-        // Crear un grupo que representa el modelo IFC
-        const ifcGroup = new THREE.Group();
-        ifcGroup.name = "IFC_Model";
+        // Create simple building group
+        const buildingGroup = new THREE.Group();
+        buildingGroup.name = "Simple_IFC_Model_" + (fileName || "unknown");
         
-        // Crear geometría para un edificio más detallado basado en el nombre del archivo
-        // Edificio principal
-        const buildingGeometry = new THREE.BoxGeometry(8, 12, 10);
-        const buildingMaterial = new THREE.MeshStandardMaterial({
+        // Main structure - a blue semi-transparent box
+        const mainGeometry = new THREE.BoxGeometry(8, 12, 10);
+        const mainMaterial = new THREE.MeshStandardMaterial({
           color: 0x3b82f6,
           transparent: true,
-          opacity: 0.75,
+          opacity: 0.7,
         });
-        const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
-        building.position.set(0, 6, 0);
-        ifcGroup.add(building);
+        const mainBuilding = new THREE.Mesh(mainGeometry, mainMaterial);
+        mainBuilding.position.set(0, 6, 0);
+        buildingGroup.add(mainBuilding);
         
-        // Añadir ventanas (representadas como cajas)
-        const windowMaterial = new THREE.MeshStandardMaterial({
-          color: 0x90cdf4,
-          transparent: true,
-          opacity: 0.8,
-        });
+        // Add floor
+        const floorGeometry = new THREE.BoxGeometry(12, 0.5, 14);
+        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x6b7280 });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.position.set(0, 0, 0);
+        buildingGroup.add(floor);
         
-        // Crear ventanas en filas
-        for (let floor = 1; floor < 4; floor++) {
-          for (let i = -2; i <= 2; i += 1.5) {
-            const windowGeom = new THREE.BoxGeometry(1, 1.5, 0.1);
-            const windowMesh = new THREE.Mesh(windowGeom, windowMaterial);
-            windowMesh.position.set(i, floor * 3, 5.05);
-            ifcGroup.add(windowMesh);
-            
-            // Ventanas en el lado opuesto
-            const backWindow = windowMesh.clone();
-            backWindow.position.z = -5.05;
-            ifcGroup.add(backWindow);
-            
-            // Ventanas laterales si hay espacio
-            if (i > -2 && i < 2) {
-              const sideWindow = windowMesh.clone();
-              sideWindow.rotation.y = Math.PI / 2;
-              sideWindow.position.set(4.05, floor * 3, i);
-              ifcGroup.add(sideWindow);
-              
-              const otherSideWindow = sideWindow.clone();
-              otherSideWindow.position.x = -4.05;
-              ifcGroup.add(otherSideWindow);
-            }
-          }
-        }
+        // Add the group to the scene
+        sceneRef.current.add(buildingGroup);
         
-        // Añadir techo
-        const roofGeometry = new THREE.ConeGeometry(6, 3, 4);
-        const roofMaterial = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
-        const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-        roof.position.set(0, 13.5, 0);
-        roof.rotation.y = Math.PI / 4;
-        ifcGroup.add(roof);
-        
-        // Añadir el terreno
-        const groundGeometry = new THREE.CircleGeometry(15, 32);
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0x4ade80,
-          side: THREE.DoubleSide
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ifcGroup.add(ground);
-        
-        // Añadir el grupo a la escena
-        sceneRef.current.add(ifcGroup);
-        
-        // Crear una caja contenedora para calcular el centro y el tamaño del modelo
-        const box = new THREE.Box3().setFromObject(ifcGroup);
+        // Create a box to calculate size and center
+        const box = new THREE.Box3().setFromObject(buildingGroup);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         
-        // Calcular la distancia para ver correctamente el modelo
+        // Calculate distance for camera
         const maxDim = Math.max(size.x, size.y, size.z);
         const distance = maxDim * 2;
         
-        // Colocar la cámara para mirar al modelo
+        // Position camera
         if (cameraRef.current && controlsRef.current) {
           cameraRef.current.position.set(
             center.x + distance,
@@ -293,23 +220,24 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
           controlsRef.current.update();
         }
         
-        // Guardar referencia al modelo
+        // Store model reference
         modelRef.current = {
-          mesh: ifcGroup,
-          id: "simulated-ifc-model"
+          mesh: buildingGroup,
+          id: "simple-ifc-representation"
         };
         
+        // Update state
         setModelLoaded(true);
         setIsLoading(false);
-        setLoadingStatus(`Modelo ${fileName || ''} visualizado (modo simplificado)`);
+        setLoadingStatus(`Modelo ${fileName || ''} representado (modo muy simple)`);
         
+        // Show toast
         toast({
-          title: "Modelo visualizado",
-          description: `El modelo ${fileName || 'IFC'} ha sido representado en modo simplificado`,
+          title: "Modelo representado",
+          description: `Se ha creado una representación básica para ${fileName || 'el archivo IFC'}`,
         });
-        
       } catch (e) {
-        console.error("Error creando modelo simulado:", e);
+        console.error("Error creando modelo simplificado:", e);
         createDemoScene();
         setError('Error al crear visualización del modelo');
         setErrorDetails(e instanceof Error ? e.message : String(e));
@@ -333,18 +261,6 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
         building.position.set(0, 5, 0);
         sceneRef.current.add(building);
-        
-        // Add a second building
-        const building2Geometry = new THREE.BoxGeometry(4, 7, 4);
-        const building2Material = new THREE.MeshStandardMaterial({ 
-          color: 0x34d399,
-          transparent: true,
-          opacity: 0.7,
-          wireframe: false
-        });
-        const building2 = new THREE.Mesh(building2Geometry, building2Material);
-        building2.position.set(-8, 3.5, 5);
-        sceneRef.current.add(building2);
         
         // Add a floor plane
         const floorGeometry = new THREE.PlaneGeometry(30, 30);
@@ -444,7 +360,6 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
       controlsRef.current.target.copy(center);
       controlsRef.current.update();
       
-      console.log("Framed all objects");
       toast({
         title: "Vista ajustada",
         description: "Posición de cámara optimizada",
