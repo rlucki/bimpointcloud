@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useToast } from "@/components/ui/use-toast";
@@ -22,12 +21,78 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<any>(null);
   const animationRef = useRef<number | null>(null);
+  const loadedFilesRef = useRef<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [viewInitialized, setViewInitialized] = useState(false);
   const { toast } = useToast();
+  
+  // Flag to prevent automatic reframing
+  const autoFramingDisabledRef = useRef(false);
+
+  // Handle WebGL context loss
+  const handleContextLost = () => {
+    console.warn("WebGL context lost - will attempt to recover");
+    
+    if (rendererRef.current) {
+      // Stop animation loop to prevent further rendering attempts
+      if (animationRef.current !== null) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      
+      // Attempt to recover in a short while
+      setTimeout(() => {
+        if (containerRef.current && rendererRef.current) {
+          try {
+            // Dispose old renderer
+            rendererRef.current.dispose();
+            
+            // Create new renderer
+            const newRenderer = new THREE.WebGLRenderer({ 
+              antialias: true,
+              powerPreference: "high-performance",
+              preserveDrawingBuffer: true
+            });
+            newRenderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
+            newRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
+            
+            // Replace old canvas with new one
+            if (containerRef.current.contains(rendererRef.current.domElement)) {
+              containerRef.current.removeChild(rendererRef.current.domElement);
+            }
+            containerRef.current.appendChild(newRenderer.domElement);
+            rendererRef.current = newRenderer;
+            
+            // Restart animation loop
+            if (animationRef.current === null && sceneRef.current && cameraRef.current) {
+              const animate = () => {
+                animationRef.current = requestAnimationFrame(animate);
+                if (controlsRef.current) {
+                  controlsRef.current.update();
+                }
+                newRenderer.render(sceneRef.current, cameraRef.current);
+              };
+              animate();
+            }
+            
+            console.log("WebGL context recovered successfully");
+          } catch (e) {
+            console.error("Failed to recover from WebGL context loss:", e);
+            setLoadingError("Error de renderizado gráfico. Por favor, recargue la página.");
+          }
+        }
+      }, 1000);
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
+    
+    // Disable auto framing after initialization
+    setTimeout(() => {
+      autoFramingDisabledRef.current = true;
+      console.log("Automatic framing disabled");
+    }, 3000);
 
     const initializeViewer = async () => {
       try {
@@ -46,17 +111,32 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         camera.lookAt(0, 0, 0);
         cameraRef.current = camera;
         
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        // Create renderer with better WebGL settings
+        const renderer = new THREE.WebGLRenderer({ 
+          antialias: true,
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: true
+        });
         renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for better performance
         containerRef.current.appendChild(renderer.domElement);
         rendererRef.current = renderer;
+        
+        // Add context loss/restore event listeners
+        renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
         
         // Add controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.target.set(0, 0, 0);
         controls.update();
         controls.enableDamping = true;
+        controls.dampingFactor = 0.05; // Make controls smoother
+        
+        // Important: Add event listener to detect user interaction and disable auto-framing
+        controls.addEventListener('start', () => {
+          autoFramingDisabledRef.current = true;
+        });
+        
         controlsRef.current = controls;
         
         // Create a grid
@@ -137,6 +217,12 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
     // Simple model creation based on URL without using IFC loader
     const createSimpleModelFromUrl = async (url: string, fileName: string, fileId: string) => {
       try {
+        // Skip if we've already loaded this file
+        if (loadedFilesRef.current.has(fileId)) {
+          console.log(`Model ${fileId} already loaded, skipping`);
+          return;
+        }
+        
         setIsLoading(true);
         toast({
           title: "Representando modelo",
@@ -144,6 +230,9 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         });
 
         console.log("Creando representación simple para:", url);
+        
+        // Track that we're loading this file
+        loadedFilesRef.current.add(fileId);
         
         // Short delay to simulate processing
         setTimeout(() => {
@@ -170,7 +259,8 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
             const size = box.getSize(new THREE.Vector3());
             
             // Only set camera position once when model is first loaded
-            if (cameraRef.current && controlsRef.current && !viewInitialized) {
+            // And now only if auto framing is not disabled
+            if (cameraRef.current && controlsRef.current && !autoFramingDisabledRef.current) {
               const maxDim = Math.max(size.x, size.y, size.z);
               const distance = maxDim * 2;
               
@@ -363,9 +453,19 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
       
-      if (rendererRef.current && containerRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
+      if (rendererRef.current) {
+        // Remove event listeners
+        rendererRef.current.domElement.removeEventListener('webglcontextlost', handleContextLost);
+        
+        // Dispose renderer
+        if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
+          containerRef.current.removeChild(rendererRef.current.domElement);
+        }
         rendererRef.current.dispose();
+      }
+      
+      if (controlsRef.current) {
+        controlsRef.current.dispose();
       }
       
       window.removeEventListener('resize', () => {});
@@ -373,6 +473,9 @@ const ViewerMain: React.FC<ViewerMainProps> = ({
       if (viewerRef.current) {
         viewerRef.current = null;
       }
+      
+      // Clear loaded files tracking
+      loadedFilesRef.current.clear();
     };
   }, [files, setLoadingError, toast, onModelLoad]);
   

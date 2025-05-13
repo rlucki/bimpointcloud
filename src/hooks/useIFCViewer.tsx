@@ -1,4 +1,3 @@
-
 import { useRef, useState, useEffect } from "react";
 import * as THREE from "three";
 import { useToast } from "@/components/ui/use-toast";
@@ -25,11 +24,20 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
   const modelRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
   
+  // Flag to prevent automatic framing
+  const autoFrameDisabledRef = useRef(false);
+  
   const { toast } = useToast();
   
   // Initialize viewer
   useEffect(() => {
     let cleanup: (() => void) | undefined;
+    
+    // Disable auto framing after a short delay
+    setTimeout(() => {
+      autoFrameDisabledRef.current = true;
+      console.log("Auto framing disabled in useIFCViewer");
+    }, 3000);
     
     const initViewer = async () => {
       try {
@@ -67,6 +75,12 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         controls.dampingFactor = 0.05;
         controls.screenSpacePanning = true;
         controls.target.set(0, 0, 0);
+        
+        // Important: Listen for user interaction to disable auto framing
+        controls.addEventListener('start', () => {
+          autoFrameDisabledRef.current = true;
+        });
+        
         controls.update();
         controlsRef.current = controls;
         
@@ -125,7 +139,7 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
             rendererRef.current.dispose();
           }
           
-          // Clear scene
+          // Clean up scene
           if (sceneRef.current) {
             while(sceneRef.current.children.length > 0) { 
               const object = sceneRef.current.children[0];
@@ -205,19 +219,22 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         
-        // Calculate distance for camera
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const distance = maxDim * 2;
-        
-        // Position camera
-        if (cameraRef.current && controlsRef.current) {
-          cameraRef.current.position.set(
-            center.x + distance,
-            center.y + distance / 1.5,
-            center.z + distance
-          );
-          controlsRef.current.target.copy(center);
-          controlsRef.current.update();
+        // Only position camera if auto framing is not disabled
+        if (!autoFrameDisabledRef.current) {
+          // Calculate distance for camera
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const distance = maxDim * 2;
+          
+          // Position camera
+          if (cameraRef.current && controlsRef.current) {
+            cameraRef.current.position.set(
+              center.x + distance,
+              center.y + distance / 1.5,
+              center.z + distance
+            );
+            controlsRef.current.target.copy(center);
+            controlsRef.current.update();
+          }
         }
         
         // Store model reference
@@ -317,11 +334,14 @@ export const useIFCViewer = ({ containerRef, fileUrl, fileName }: UseIFCViewerPr
     };
   }, [containerRef, fileUrl, fileName, toast]);
   
-  // Frame all objects in view
+  // Frame all objects - modified to respect the auto frame disabled flag
   const frameAll = async () => {
     if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return;
     
     try {
+      // Set the auto frame disabled flag to prevent future auto framing
+      autoFrameDisabledRef.current = true;
+      
       // Find all visible meshes in the scene
       const meshes: THREE.Object3D[] = [];
       sceneRef.current.traverse((object) => {

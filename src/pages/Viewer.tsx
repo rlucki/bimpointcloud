@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
@@ -34,6 +33,7 @@ const Viewer = () => {
   const [visibleFiles, setVisibleFiles] = useState<{[key: string]: boolean}>({});
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [lastFrameTime, setLastFrameTime] = useState(0);
+  const [userInteracted, setUserInteracted] = useState(false);
   const frameTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Model references
@@ -74,6 +74,22 @@ const Viewer = () => {
       }
     });
     setVisibleFiles(initialVisibility);
+    
+    // Add event listener to detect first user interaction
+    const handleUserInteraction = () => {
+      setUserInteracted(true);
+      // Clean up after capturing first interaction
+      document.removeEventListener('mousedown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+    
+    document.addEventListener('mousedown', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
   }, []);
   
   // Check for files and simulate loading
@@ -134,7 +150,7 @@ const Viewer = () => {
     }
   };
 
-  // Frame all objects - with cooldown to prevent too frequent reframing
+  // Frame all objects - with much longer cooldown to prevent too frequent reframing
   const handleFrameAll = () => {
     const now = Date.now();
     
@@ -143,8 +159,9 @@ const Viewer = () => {
       clearTimeout(frameTimeoutRef.current);
     }
     
-    // Only allow framing once every 2 seconds to prevent accidental double-clicks
-    if (now - lastFrameTime > 2000) {
+    // Only allow framing once every 10 seconds (increased from 2 seconds)
+    // And only allow framing if initiated by user click
+    if (now - lastFrameTime > 10000) {
       setLastFrameTime(now);
       console.log("Frame all objects - user triggered");
       
@@ -192,7 +209,12 @@ const Viewer = () => {
   }
   
   return (
-    <div className="min-h-screen flex flex-col bg-[#222222]">
+    <div 
+      className="min-h-screen flex flex-col bg-[#222222]"
+      // Add these handlers to prevent auto-framing on user interaction
+      onMouseDown={() => setUserInteracted(true)}
+      onTouchStart={() => setUserInteracted(true)}
+    >
       {/* Top Navigation Bar */}
       <header className="bg-[#333333] border-b border-[#444444] h-12 flex items-center justify-between px-4">
         <div className="flex items-center">
